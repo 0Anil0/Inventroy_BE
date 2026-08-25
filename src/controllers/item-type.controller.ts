@@ -13,12 +13,12 @@ export class ItemTypeController {
 
   public static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { name, code, unit, description } = req.body;
+      const { name, code, unit, unit_id, description } = req.body;
       if (!name || !code) {
         res.status(400).json({ success: false, message: 'Name and Code are required' });
         return;
       }
-      const item = await ItemTypeService.create({ name, code, unit, description });
+      const item = await ItemTypeService.create({ name, code, unit, unit_id, description });
       res.status(201).json({ success: true, item });
     } catch (error: any) {
       res.status(400).json({ success: false, message: error.message });

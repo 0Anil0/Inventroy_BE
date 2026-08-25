@@ -6,19 +6,21 @@ export interface ItemTypeAttributes {
   name: string;
   code: string;
   unit: string; // e.g. pcs, kg, meters, boxes
+  unit_id?: number | null;
   total_quantity?: number; // Central Catalog Stock Available
   description?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-export interface ItemTypeCreationAttributes extends Optional<ItemTypeAttributes, 'id' | 'total_quantity'> {}
+export interface ItemTypeCreationAttributes extends Optional<ItemTypeAttributes, 'id' | 'total_quantity' | 'unit_id'> {}
 
 export class ItemType extends Model<ItemTypeAttributes, ItemTypeCreationAttributes> implements ItemTypeAttributes {
   declare public id: number;
   declare public name: string;
   declare public code: string;
   declare public unit: string;
+  declare public unit_id: number | null;
   declare public total_quantity: number;
   declare public description: string | null;
 
@@ -46,6 +48,14 @@ ItemType.init(
       type: DataTypes.STRING(30),
       allowNull: false,
       defaultValue: 'pcs',
+    },
+    unit_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'units',
+        key: 'id',
+      },
     },
     total_quantity: {
       type: DataTypes.FLOAT,
