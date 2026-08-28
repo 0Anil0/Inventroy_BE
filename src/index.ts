@@ -58,13 +58,14 @@ const startServer = async () => {
       await sequelize.sync({ alter: true });
       console.log('Sequelize models synchronized successfully.');
 
-      // Seed roles, admin, units, item types, projects, vendors, and initial inventory
+      try {
+        await sequelize.query('ALTER TABLE stock_movements ALTER COLUMN project_id DROP NOT NULL;');
+      } catch (e) {
+        // Column may already be nullable
+      }
+
+      // Ensure roles and admin account exist
       await UserService.seedRolesAndAdmin();
-      await UnitService.seedDefaultUnits();
-      await ItemTypeService.seedDefaultItemTypes();
-      await ProjectService.seedDefaultProjects();
-      await VendorService.seedDefaultVendors();
-      await InventoryService.seedInitialInventory();
     } else {
       console.warn('Database connection failed. Please check PostgreSQL server settings.');
     }

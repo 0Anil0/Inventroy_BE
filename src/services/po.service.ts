@@ -153,15 +153,14 @@ export class POService {
         });
       } else {
         // Log movement for central warehouse stock
-        // Find default project or general stock log
         await StockMovement.create({
-          project_id: 1,
+          project_id: (po.project_id as any) || null,
           item_type_id: item.item_type_id,
           user_id: userId || null,
           type: 'IN',
           quantity: qtyReceived,
-          previous_quantity: 0,
-          new_quantity: qtyReceived,
+          previous_quantity: itemType.total_quantity - qtyReceived,
+          new_quantity: newCentralStock,
           notes: `Central Catalog Stock Received via ${po.po_number} (Supplier: ${vendorName})`,
         });
       }

@@ -24,7 +24,9 @@ export class InventoryService {
   }
 
   /**
-   * Adjusts / updates project stock quantity and updates central item stock in item_types table
+   * Adjusts / allocates stock quantity from Central Warehouse to Project Site
+   * - Deducts allocated quantity from Central Warehouse (item_types.total_quantity)
+   * - Increases Project Inventory quantity (project_inventory.quantity)
    */
   public static async adjustQuantity(data: {
     project_id: number;
@@ -62,18 +64,15 @@ export class InventoryService {
       targetProjectQty = Math.max(0, oldProjectQty - amount);
     }
 
-    const diff = targetProjectQty - oldProjectQty;
+    const diff = targetProjectQty - oldProjectQty; // Positive = allocating TO project, Negative = returning TO central
 
-    // Total available stock in database for this item (Current Item DB Stock + Current Project Stock)
-    const maxAvailableFromDB = itemType.total_quantity + oldProjectQty;
-
-    if (targetProjectQty > maxAvailableFromDB) {
+    if (diff > 0 && itemType.total_quantity < diff) {
       throw new Error(
-        `Quantity allocated (${targetProjectQty} ${itemType.unit}) exceeds available stock in DB (${maxAvailableFromDB} ${itemType.unit})`
+        `Cannot allocate ${diff} ${itemType.unit} to project. Central Warehouse only has ${itemType.total_quantity} ${itemType.unit} available.`
       );
     }
 
-    // Update central item_types table total_quantity
+    // Deduct allocated amount from Central Warehouse Stock, or return stock to Central Warehouse if diff < 0
     const newCentralStock = Math.max(0, itemType.total_quantity - diff);
     await itemType.update({ total_quantity: newCentralStock });
 
@@ -98,7 +97,7 @@ export class InventoryService {
         quantity: Math.abs(diff),
         previous_quantity: oldProjectQty,
         new_quantity: targetProjectQty,
-        notes: notes || `Stock updated to ${targetProjectQty} ${itemType.unit}`,
+        notes: notes || `Allocated ${diff > 0 ? '+' : ''}${diff} ${itemType.unit} from Central Warehouse to ${project.name}`,
       });
     }
 
@@ -317,51 +316,5 @@ export class InventoryService {
       projectBreakdown,
       recentMovements,
     };
-  }
-
-  /**
-   * Seeds initial quantities for project inventory items
-   */
-  public static async seedInitialInventory() {
-    try {
-      const projects = await Project.findAll();
-      const itemTypes = await ItemType.findAll();
-
-      if (projects.length > 0 && itemTypes.length > 0) {
-        const sampleProj = projects[0];
-        const initialQuantities = [150, 450, 75, 1200];
-
-        for (let i = 0; i < itemTypes.length; i++) {
-          const item = itemTypes[i];
-          const qty = initialQuantities[i % initialQuantities.length];
-          const existing = await ProjectInventory.findOne({
-            where: { project_id: sampleProj.id, item_type_id: item.id },
-          });
-          if (!existing) {
-            await ProjectInventory.create({
-              project_id: sampleProj.id,
-              item_type_id: item.id,
-              quantity: qty,
-              min_quantity: 50,
-            });
-            const updatedCentral = Math.max(0, item.total_quantity - qty);
-            await item.update({ total_quantity: updatedCentral });
-
-            await StockMovement.create({
-              project_id: sampleProj.id,
-              item_type_id: item.id,
-              type: 'IN',
-              quantity: qty,
-              previous_quantity: 0,
-              new_quantity: qty,
-              notes: 'Initial seed stock allocation',
-            });
-          }
-        }
-        console.log(`Initial stock quantities seeded for Project: ${sampleProj.name}`);
-      }
-    } catch (error) {
-      console.error('Error seeding inventory stock:', error);
-    }
   }
 }
