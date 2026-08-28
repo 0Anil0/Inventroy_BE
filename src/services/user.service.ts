@@ -21,12 +21,81 @@ export class UserService {
   }
 
   /**
-   * Fetches all available roles
+   * Fetches all available roles with user counts
    */
   public static async getAllRoles() {
     return await Role.findAll({
       order: [['id', 'ASC']],
+      include: [
+        {
+          model: User,
+          as: 'users',
+          attributes: ['id'],
+        },
+      ],
     });
+  }
+
+  /**
+   * Creates a new System Role
+   */
+  public static async createRole(data: { name: string; description?: string }) {
+    const existing = await Role.findOne({ where: { name: data.name.trim().toLowerCase() } });
+    if (existing) {
+      throw new Error(`Role '${data.name}' already exists`);
+    }
+
+    return await Role.create({
+      name: data.name.trim().toLowerCase(),
+      description: data.description ? data.description.trim() : null,
+    });
+  }
+
+  /**
+   * Updates an existing System Role
+   */
+  public static async updateRole(id: number, data: { name?: string; description?: string }) {
+    const role = await Role.findByPk(id);
+    if (!role) {
+      throw new Error('Role not found');
+    }
+
+    if (data.name && data.name.trim().toLowerCase() !== role.name.toLowerCase()) {
+      const existing = await Role.findOne({ where: { name: data.name.trim().toLowerCase() } });
+      if (existing) {
+        throw new Error(`Role '${data.name}' already exists`);
+      }
+      role.name = data.name.trim().toLowerCase();
+    }
+
+    if (data.description !== undefined) {
+      role.description = data.description ? data.description.trim() : null;
+    }
+
+    await role.save();
+    return role;
+  }
+
+  /**
+   * Deletes a System Role by ID
+   */
+  public static async deleteRole(id: number) {
+    const role = await Role.findByPk(id);
+    if (!role) {
+      throw new Error('Role not found');
+    }
+
+    if (role.name.toLowerCase() === 'admin') {
+      throw new Error('Cannot delete default system Admin role');
+    }
+
+    const assignedUsersCount = await User.count({ where: { role_id: id } });
+    if (assignedUsersCount > 0) {
+      throw new Error(`Cannot delete role '${role.name}'. ${assignedUsersCount} user(s) are currently assigned to this role.`);
+    }
+
+    await role.destroy();
+    return { success: true, message: `Role '${role.name}' deleted successfully` };
   }
 
   /**

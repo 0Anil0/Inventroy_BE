@@ -20,6 +20,41 @@ export class UserController {
     }
   }
 
+  public static async createRole(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { name, description } = req.body;
+      if (!name) {
+        res.status(400).json({ success: false, message: 'Role name is required' });
+        return;
+      }
+      const role = await UserService.createRole({ name, description });
+      res.status(201).json({ success: true, role });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message || 'Failed to create role' });
+    }
+  }
+
+  public static async updateRole(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      const { name, description } = req.body;
+      const role = await UserService.updateRole(id, { name, description });
+      res.json({ success: true, role });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message || 'Failed to update role' });
+    }
+  }
+
+  public static async deleteRole(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      const result = await UserService.deleteRole(id);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message || 'Failed to delete role' });
+    }
+  }
+
   public static async createUser(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { username, email, password, role_id } = req.body;
