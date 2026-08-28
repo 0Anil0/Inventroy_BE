@@ -20,6 +20,7 @@ import stockMovementRoutes from './routes/stock-movement.routes';
 import vendorRoutes from './routes/vendor.routes';
 import poRoutes from './routes/po.routes';
 import materialIssueRoutes from './routes/material-issue.routes';
+import reportRoutes from './routes/report.routes';
 import { errorHandler } from './middlewares/error.middleware';
 
 const app = express();
@@ -39,6 +40,7 @@ app.use('/api', stockMovementRoutes);
 app.use('/api', vendorRoutes);
 app.use('/api', poRoutes);
 app.use('/api', materialIssueRoutes);
+app.use('/api', reportRoutes);
 
 // Health Check Route
 app.get('/api/health', (req: Request, res: Response) => {
