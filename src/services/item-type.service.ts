@@ -8,7 +8,14 @@ export class ItemTypeService {
     });
   }
 
-  public static async create(data: { name: string; code: string; unit?: string; unit_id?: number; total_quantity?: number; description?: string }) {
+  public static async create(data: {
+    name: string;
+    code: string;
+    unit?: string;
+    unit_id?: number;
+    total_quantity?: number;
+    description?: string;
+  }) {
     const existingCode = await ItemType.findOne({ where: { code: data.code } });
     if (existingCode) {
       throw new Error('Item type code already exists');
@@ -22,7 +29,7 @@ export class ItemTypeService {
       }
     }
 
-    return await ItemType.create({
+    const created = await ItemType.create({
       name: data.name,
       code: data.code,
       unit: unitStr,
@@ -30,9 +37,23 @@ export class ItemTypeService {
       total_quantity: data.total_quantity !== undefined ? data.total_quantity : 0,
       description: data.description || null,
     });
+
+    return await ItemType.findByPk(created.id, {
+      include: [{ model: Unit, as: 'unit_details', required: false }],
+    });
   }
 
-  public static async update(id: number, data: { name?: string; code?: string; unit?: string; unit_id?: number; total_quantity?: number; description?: string }) {
+  public static async update(
+    id: number,
+    data: {
+      name?: string;
+      code?: string;
+      unit?: string;
+      unit_id?: number;
+      total_quantity?: number;
+      description?: string;
+    }
+  ) {
     const item = await ItemType.findByPk(id);
     if (!item) throw new Error('Item type not found');
 

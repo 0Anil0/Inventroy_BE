@@ -7,6 +7,7 @@ import { ItemTypeService } from './services/item-type.service';
 import { ProjectService } from './services/project.service';
 import { InventoryService } from './services/inventory.service';
 import { UnitService } from './services/unit.service';
+import { VendorService } from './services/vendor.service';
 
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
@@ -14,6 +15,11 @@ import itemTypeRoutes from './routes/item-type.routes';
 import projectRoutes from './routes/project.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import unitRoutes from './routes/unit.routes';
+import dashboardRoutes from './routes/dashboard.routes';
+import stockMovementRoutes from './routes/stock-movement.routes';
+import vendorRoutes from './routes/vendor.routes';
+import poRoutes from './routes/po.routes';
+import materialIssueRoutes from './routes/material-issue.routes';
 import { errorHandler } from './middlewares/error.middleware';
 
 const app = express();
@@ -28,6 +34,11 @@ app.use('/api', itemTypeRoutes);
 app.use('/api', projectRoutes);
 app.use('/api', inventoryRoutes);
 app.use('/api', unitRoutes);
+app.use('/api', dashboardRoutes);
+app.use('/api', stockMovementRoutes);
+app.use('/api', vendorRoutes);
+app.use('/api', poRoutes);
+app.use('/api', materialIssueRoutes);
 
 // Health Check Route
 app.get('/api/health', (req: Request, res: Response) => {
@@ -47,11 +58,12 @@ const startServer = async () => {
       await sequelize.sync({ alter: true });
       console.log('Sequelize models synchronized successfully.');
 
-      // Seed roles, admin, units, item types, projects, and initial inventory
+      // Seed roles, admin, units, item types, projects, vendors, and initial inventory
       await UserService.seedRolesAndAdmin();
       await UnitService.seedDefaultUnits();
       await ItemTypeService.seedDefaultItemTypes();
       await ProjectService.seedDefaultProjects();
+      await VendorService.seedDefaultVendors();
       await InventoryService.seedInitialInventory();
     } else {
       console.warn('Database connection failed. Please check PostgreSQL server settings.');

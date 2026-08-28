@@ -1,11 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import { ItemTypeService } from '../services/item-type.service';
+import { VendorService } from '../services/vendor.service';
 
-export class ItemTypeController {
+export class VendorController {
   public static async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const items = await ItemTypeService.getAll();
-      res.json({ success: true, items });
+      const vendors = await VendorService.getAll();
+      res.json({ success: true, vendors });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
@@ -13,20 +13,20 @@ export class ItemTypeController {
 
   public static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { name, code, unit, unit_id, total_quantity, description } = req.body;
-      if (!name || !code) {
-        res.status(400).json({ success: false, message: 'Name and Code are required' });
+      const { name, contact_person, phone, email, address, tax_id } = req.body;
+      if (!name) {
+        res.status(400).json({ success: false, message: 'Vendor name is required' });
         return;
       }
-      const item = await ItemTypeService.create({
+      const vendor = await VendorService.create({
         name,
-        code,
-        unit,
-        unit_id,
-        total_quantity: total_quantity !== undefined ? parseFloat(String(total_quantity)) : 0,
-        description,
+        contact_person,
+        phone,
+        email,
+        address,
+        tax_id,
       });
-      res.status(201).json({ success: true, item });
+      res.status(201).json({ success: true, vendor });
     } catch (error: any) {
       res.status(400).json({ success: false, message: error.message });
     }
@@ -35,8 +35,8 @@ export class ItemTypeController {
   public static async update(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = parseInt(String(req.params.id), 10);
-      const item = await ItemTypeService.update(id, req.body);
-      res.json({ success: true, item });
+      const vendor = await VendorService.update(id, req.body);
+      res.json({ success: true, vendor });
     } catch (error: any) {
       res.status(400).json({ success: false, message: error.message });
     }
@@ -45,7 +45,7 @@ export class ItemTypeController {
   public static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = parseInt(String(req.params.id), 10);
-      const result = await ItemTypeService.delete(id);
+      const result = await VendorService.delete(id);
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ success: false, message: error.message });

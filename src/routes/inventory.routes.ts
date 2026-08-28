@@ -9,5 +9,6 @@ router.use(authenticateToken);
 router.get('/inventory/project/:projectId', InventoryController.getByProjectId);
 router.post('/inventory/adjust', InventoryController.adjustQuantity);
 router.post('/inventory/batch-adjust', InventoryController.batchAdjustQuantity);
+router.post('/inventory/transfer', InventoryController.transferStock);
 
 export default router;
