@@ -72,8 +72,8 @@ const startServer = async () => {
       console.warn('Database connection failed. Please check PostgreSQL server settings.');
     }
 
-    app.listen(env.port, () => {
-      console.log(`🚀 Server ready & listening on http://localhost:${env.port}`);
+    app.listen(env.port, '0.0.0.0', () => {
+      console.log(`🚀 Backend Server listening on http://0.0.0.0:${env.port} (Network Access Ready)`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

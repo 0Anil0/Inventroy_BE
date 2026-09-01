@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "migrate": "tsx src/db/migrate.ts",
+    "reset:inventory": "tsx src/scripts/resetData.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
