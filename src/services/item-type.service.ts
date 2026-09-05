@@ -11,10 +11,17 @@ export class ItemTypeService {
   public static async create(data: {
     name: string;
     code: string;
+    cat_no?: string;
+    make?: string;
+    rating?: string;
+    switchgear_family?: string;
+    full_description?: string;
     unit?: string;
     unit_id?: number;
     total_quantity?: number;
     description?: string;
+    unit_rate?: number;
+    discount?: number;
   }) {
     const existingCode = await ItemType.findOne({ where: { code: data.code } });
     if (existingCode) {
@@ -32,10 +39,17 @@ export class ItemTypeService {
     const created = await ItemType.create({
       name: data.name,
       code: data.code,
+      cat_no: data.cat_no || null,
+      make: data.make || null,
+      rating: data.rating || null,
+      switchgear_family: data.switchgear_family || null,
+      full_description: data.full_description || null,
       unit: unitStr,
       unit_id: data.unit_id || null,
       total_quantity: data.total_quantity !== undefined ? data.total_quantity : 0,
       description: data.description || null,
+      unit_rate: data.unit_rate || 0,
+      discount: data.discount || 0,
     });
 
     return await ItemType.findByPk(created.id, {
@@ -48,10 +62,17 @@ export class ItemTypeService {
     data: {
       name?: string;
       code?: string;
+      cat_no?: string;
+      make?: string;
+      rating?: string;
+      switchgear_family?: string;
+      full_description?: string;
       unit?: string;
       unit_id?: number;
       total_quantity?: number;
       description?: string;
+      unit_rate?: number;
+      discount?: number;
     }
   ) {
     const item = await ItemType.findByPk(id);

@@ -6,16 +6,20 @@ export interface PurchaseOrderItemAttributes {
   id: number;
   po_id: number;
   item_type_id: number;
+  cat_no?: string | null;
+  make?: string | null;
+  rating?: string | null;
   ordered_qty: number;
   received_qty?: number;
   unit_price?: number;
+  discount_percent?: number;
   total_price?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 export interface PurchaseOrderItemCreationAttributes
-  extends Optional<PurchaseOrderItemAttributes, 'id' | 'received_qty' | 'unit_price' | 'total_price'> {}
+  extends Optional<PurchaseOrderItemAttributes, 'id' | 'received_qty' | 'unit_price' | 'discount_percent' | 'total_price'> {}
 
 export class PurchaseOrderItem
   extends Model<PurchaseOrderItemAttributes, PurchaseOrderItemCreationAttributes>
@@ -24,9 +28,13 @@ export class PurchaseOrderItem
   declare public id: number;
   declare public po_id: number;
   declare public item_type_id: number;
+  declare public cat_no: string | null;
+  declare public make: string | null;
+  declare public rating: string | null;
   declare public ordered_qty: number;
   declare public received_qty: number;
   declare public unit_price: number;
+  declare public discount_percent: number;
   declare public total_price: number;
 
   declare public readonly createdAt: Date;
@@ -58,6 +66,18 @@ PurchaseOrderItem.init(
         key: 'id',
       },
     },
+    cat_no: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+    make: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+    rating: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+    },
     ordered_qty: {
       type: DataTypes.FLOAT,
       allowNull: false,
@@ -68,6 +88,11 @@ PurchaseOrderItem.init(
       defaultValue: 0,
     },
     unit_price: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    discount_percent: {
       type: DataTypes.FLOAT,
       allowNull: false,
       defaultValue: 0,

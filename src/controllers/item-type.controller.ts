@@ -13,7 +13,7 @@ export class ItemTypeController {
 
   public static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { name, code, unit, unit_id, total_quantity, description } = req.body;
+      const { name, code, cat_no, make, rating, switchgear_family, full_description, unit, unit_id, total_quantity, description, unit_rate, discount } = req.body;
       if (!name || !code) {
         res.status(400).json({ success: false, message: 'Name and Code are required' });
         return;
@@ -21,10 +21,17 @@ export class ItemTypeController {
       const item = await ItemTypeService.create({
         name,
         code,
+        cat_no,
+        make,
+        rating,
+        switchgear_family,
+        full_description,
         unit,
         unit_id,
         total_quantity: total_quantity !== undefined ? parseFloat(String(total_quantity)) : 0,
         description,
+        unit_rate: unit_rate !== undefined ? parseFloat(String(unit_rate)) : 0,
+        discount: discount !== undefined ? parseFloat(String(discount)) : 0,
       });
       res.status(201).json({ success: true, item });
     } catch (error: any) {
