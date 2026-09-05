@@ -14,7 +14,7 @@ import {
 
 export const resetData = async () => {
   try {
-    console.log('🔄 Cleaning database: Removing all sample materials, POs, material issues, vendors, inventory, and projects...');
+    console.log('🔄 Cleaning database: Preserving ONLY Users and Roles. Wiping all other tables (Units, POs, Material Issues, Stock Movements, Inventory, Vendors, Item Types, Projects)...');
 
     await MaterialIssueItem.destroy({ where: {}, truncate: true, cascade: true });
     await MaterialIssue.destroy({ where: {}, truncate: true, cascade: true });
@@ -27,7 +27,7 @@ export const resetData = async () => {
     await Unit.destroy({ where: {}, truncate: true, cascade: true });
     await Project.destroy({ where: {}, truncate: true, cascade: true });
 
-    console.log('✅ Database cleaned successfully! All sample data wiped. Ready for fresh step-by-step entry.');
+    console.log('✅ Database cleaned successfully! Preserved ONLY Users and Roles. All operational and master tables (including Units) are now 100% empty and ready to start from scratch.');
   } catch (error) {
     console.error('Error resetting database:', error);
   }
@@ -36,3 +36,4 @@ export const resetData = async () => {
 if (require.main === module) {
   resetData().then(() => process.exit(0));
 }
+
