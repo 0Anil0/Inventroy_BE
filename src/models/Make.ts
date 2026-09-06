@@ -1,30 +1,28 @@
 import { Model, DataTypes, Optional } from 'sequelize';
 import { sequelize } from '../config/database';
 
-export interface ProjectAttributes {
+export interface MakeAttributes {
   id: number;
   name: string;
-  code: string;
-  location?: string | null;
+  code?: string | null;
   description?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-export interface ProjectCreationAttributes extends Optional<ProjectAttributes, 'id' | 'location' | 'description'> {}
+export interface MakeCreationAttributes extends Optional<MakeAttributes, 'id' | 'code' | 'description'> {}
 
-export class Project extends Model<ProjectAttributes, ProjectCreationAttributes> implements ProjectAttributes {
+export class Make extends Model<MakeAttributes, MakeCreationAttributes> implements MakeAttributes {
   declare public id: number;
   declare public name: string;
-  declare public code: string;
-  declare public location: string | null;
+  declare public code: string | null;
   declare public description: string | null;
 
   declare public readonly createdAt: Date;
   declare public readonly updatedAt: Date;
 }
 
-Project.init(
+Make.init(
   {
     id: {
       type: DataTypes.INTEGER,
@@ -32,16 +30,12 @@ Project.init(
       primaryKey: true,
     },
     name: {
-      type: DataTypes.STRING(150),
-      allowNull: false,
-    },
-    code: {
-      type: DataTypes.STRING(50),
+      type: DataTypes.STRING(100),
       allowNull: false,
       unique: true,
     },
-    location: {
-      type: DataTypes.STRING(150),
+    code: {
+      type: DataTypes.STRING(50),
       allowNull: true,
     },
     description: {
@@ -51,7 +45,7 @@ Project.init(
   },
   {
     sequelize,
-    tableName: 'projects',
+    tableName: 'makes',
     timestamps: true,
     underscored: true,
   }
