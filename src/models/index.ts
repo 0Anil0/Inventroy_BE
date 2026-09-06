@@ -5,6 +5,7 @@ import { Make } from './Make';
 import { Unit } from './Unit';
 import { ItemType } from './ItemType';
 import { Vendor } from './Vendor';
+import { ItemDescription } from './ItemDescription';
 
 // User & Role Associations
 User.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
@@ -26,4 +27,6 @@ export {
   Unit,
   ItemType,
   Vendor,
+  ItemDescription,
 };
+
