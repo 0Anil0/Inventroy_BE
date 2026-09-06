@@ -6,6 +6,7 @@ import { Unit } from './Unit';
 import { ItemType } from './ItemType';
 import { Vendor } from './Vendor';
 import { ItemDescription } from './ItemDescription';
+import { TermsAndConditions } from './TermsAndConditions';
 
 // User & Role Associations
 User.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
@@ -28,5 +29,6 @@ export {
   ItemType,
   Vendor,
   ItemDescription,
+  TermsAndConditions,
 };
 
