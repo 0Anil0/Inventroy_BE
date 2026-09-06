@@ -1,12 +1,74 @@
+import { Op } from 'sequelize';
 import { ItemType, Unit } from '../models';
 
+export interface ItemTypeQueryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  make?: string;
+  rating?: string;
+  code?: string;
+  cat_no?: string;
+  name?: string;
+}
+
 export class ItemTypeService {
-  public static async getAll() {
-    return await ItemType.findAll({
-      order: [['id', 'ASC']],
+  public static async getAll(params: ItemTypeQueryParams = {}) {
+    const page = params.page && Number(params.page) > 0 ? Number(params.page) : 1;
+    const limit = params.limit && Number(params.limit) > 0 ? Number(params.limit) : 1000;
+    const offset = (page - 1) * limit;
+
+    const where: any = {};
+
+    if (params.search) {
+      const q = `%${params.search.trim()}%`;
+      where[Op.or] = [
+        { name: { [Op.iLike]: q } },
+        { code: { [Op.iLike]: q } },
+        { cat_no: { [Op.iLike]: q } },
+        { make: { [Op.iLike]: q } },
+        { rating: { [Op.iLike]: q } },
+        { full_description: { [Op.iLike]: q } },
+      ];
+    }
+
+    if (params.make && params.make !== 'ALL') {
+      where.make = params.make;
+    }
+
+    if (params.rating) {
+      where.rating = { [Op.iLike]: `%${params.rating.trim()}%` };
+    }
+
+    if (params.code) {
+      where.code = { [Op.iLike]: `%${params.code.trim()}%` };
+    }
+
+    if (params.cat_no) {
+      where.cat_no = { [Op.iLike]: `%${params.cat_no.trim()}%` };
+    }
+
+    if (params.name) {
+      where.name = { [Op.iLike]: `%${params.name.trim()}%` };
+    }
+
+    const { count, rows } = await ItemType.findAndCountAll({
+      where,
+      limit,
+      offset,
+      order: [['id', 'DESC']],
       include: [{ model: Unit, as: 'unit_details', required: false }],
     });
+
+    return {
+      items: rows,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+    };
   }
+
 
   public static async create(data: {
     name: string;

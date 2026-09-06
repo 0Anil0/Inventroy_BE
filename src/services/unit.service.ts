@@ -1,9 +1,55 @@
+import { Op } from 'sequelize';
 import { Unit, UnitCreationAttributes } from '../models/Unit';
 
+export interface UnitQueryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  name?: string;
+  code?: string;
+}
+
 export class UnitService {
-  public static async getAll(): Promise<Unit[]> {
-    return await Unit.findAll({ order: [['name', 'ASC']] });
+  public static async getAll(params: UnitQueryParams = {}) {
+    const page = params.page && Number(params.page) > 0 ? Number(params.page) : 1;
+    const limit = params.limit && Number(params.limit) > 0 ? Number(params.limit) : 1000;
+    const offset = (page - 1) * limit;
+
+    const where: any = {};
+
+    if (params.search) {
+      const q = `%${params.search.trim()}%`;
+      where[Op.or] = [
+        { name: { [Op.iLike]: q } },
+        { code: { [Op.iLike]: q } },
+        { description: { [Op.iLike]: q } },
+      ];
+    }
+
+    if (params.name) {
+      where.name = { [Op.iLike]: `%${params.name.trim()}%` };
+    }
+
+    if (params.code) {
+      where.code = { [Op.iLike]: `%${params.code.trim()}%` };
+    }
+
+    const { count, rows } = await Unit.findAndCountAll({
+      where,
+      limit,
+      offset,
+      order: [['name', 'ASC']],
+    });
+
+    return {
+      units: rows,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+    };
   }
+
 
   public static async getById(id: number): Promise<Unit | null> {
     return await Unit.findByPk(id);

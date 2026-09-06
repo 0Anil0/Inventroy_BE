@@ -4,12 +4,22 @@ import { VendorService } from '../services/vendor.service';
 export class VendorController {
   public static async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const vendors = await VendorService.getAll();
-      res.json({ success: true, vendors });
+      const { page, limit, search, name, contact_person, phone, email } = req.query;
+      const result = await VendorService.getAll({
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        search: search ? String(search) : undefined,
+        name: name ? String(name) : undefined,
+        contact_person: contact_person ? String(contact_person) : undefined,
+        phone: phone ? String(phone) : undefined,
+        email: email ? String(email) : undefined,
+      });
+      res.json({ success: true, ...result });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
   }
+
 
   public static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

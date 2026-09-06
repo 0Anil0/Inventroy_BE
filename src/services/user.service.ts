@@ -1,13 +1,52 @@
 import bcrypt from 'bcryptjs';
+import { Op } from 'sequelize';
 import { User, Role } from '../models';
 import { AuthService } from './auth.service';
 
+export interface UserQueryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role_id?: number;
+  username?: string;
+  email?: string;
+}
+
 export class UserService {
   /**
-   * Fetches all users with associated Role details
+   * Fetches users with pagination and search filters
    */
-  public static async getAllUsers() {
-    return await User.findAll({
+  public static async getAllUsers(params: UserQueryParams = {}) {
+    const page = params.page && Number(params.page) > 0 ? Number(params.page) : 1;
+    const limit = params.limit && Number(params.limit) > 0 ? Number(params.limit) : 1000;
+    const offset = (page - 1) * limit;
+
+    const where: any = {};
+
+    if (params.search) {
+      const q = `%${params.search.trim()}%`;
+      where[Op.or] = [
+        { username: { [Op.iLike]: q } },
+        { email: { [Op.iLike]: q } },
+      ];
+    }
+
+    if (params.role_id) {
+      where.role_id = Number(params.role_id);
+    }
+
+    if (params.username) {
+      where.username = { [Op.iLike]: `%${params.username.trim()}%` };
+    }
+
+    if (params.email) {
+      where.email = { [Op.iLike]: `%${params.email.trim()}%` };
+    }
+
+    const { count, rows } = await User.findAndCountAll({
+      where,
+      limit,
+      offset,
       attributes: ['id', 'username', 'email', 'role_id', 'createdAt', 'updatedAt'],
       include: [
         {
@@ -16,9 +55,18 @@ export class UserService {
           attributes: ['id', 'name', 'description'],
         },
       ],
-      order: [['id', 'ASC']],
+      order: [['id', 'DESC']],
     });
+
+    return {
+      users: rows,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+    };
   }
+
 
   /**
    * Fetches all available roles with user counts

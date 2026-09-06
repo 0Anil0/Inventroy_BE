@@ -4,12 +4,20 @@ import { UnitService } from '../services/unit.service';
 export class UnitController {
   public static async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const units = await UnitService.getAll();
-      res.json({ success: true, units });
+      const { page, limit, search, name, code } = req.query;
+      const result = await UnitService.getAll({
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        search: search ? String(search) : undefined,
+        name: name ? String(name) : undefined,
+        code: code ? String(code) : undefined,
+      });
+      res.json({ success: true, ...result });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
   }
+
 
   public static async getById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

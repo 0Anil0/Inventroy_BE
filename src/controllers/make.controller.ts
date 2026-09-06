@@ -4,12 +4,20 @@ import { MakeService } from '../services/make.service';
 export class MakeController {
   public static async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const makes = await MakeService.getAll();
-      res.json({ success: true, makes });
+      const { page, limit, search, name, code } = req.query;
+      const result = await MakeService.getAll({
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        search: search ? String(search) : undefined,
+        name: name ? String(name) : undefined,
+        code: code ? String(code) : undefined,
+      });
+      res.json({ success: true, ...result });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
   }
+
 
   public static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

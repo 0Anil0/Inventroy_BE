@@ -4,12 +4,21 @@ import { UserService } from '../services/user.service';
 export class UserController {
   public static async getUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const users = await UserService.getAllUsers();
-      res.json({ success: true, users });
+      const { page, limit, search, role_id, username, email } = req.query;
+      const result = await UserService.getAllUsers({
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        search: search ? String(search) : undefined,
+        role_id: role_id ? Number(role_id) : undefined,
+        username: username ? String(username) : undefined,
+        email: email ? String(email) : undefined,
+      });
+      res.json({ success: true, ...result });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message || 'Failed to fetch users' });
     }
   }
+
 
   public static async getRoles(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

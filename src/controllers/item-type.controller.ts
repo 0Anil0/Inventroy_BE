@@ -4,12 +4,23 @@ import { ItemTypeService } from '../services/item-type.service';
 export class ItemTypeController {
   public static async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const items = await ItemTypeService.getAll();
-      res.json({ success: true, items });
+      const { page, limit, search, make, rating, code, cat_no, name } = req.query;
+      const result = await ItemTypeService.getAll({
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+        search: search ? String(search) : undefined,
+        make: make ? String(make) : undefined,
+        rating: rating ? String(rating) : undefined,
+        code: code ? String(code) : undefined,
+        cat_no: cat_no ? String(cat_no) : undefined,
+        name: name ? String(name) : undefined,
+      });
+      res.json({ success: true, ...result });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
   }
+
 
   public static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {

@@ -1,9 +1,68 @@
+import { Op } from 'sequelize';
 import { Vendor } from '../models';
 
+export interface VendorQueryParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  name?: string;
+  contact_person?: string;
+  phone?: string;
+  email?: string;
+}
+
 export class VendorService {
-  public static async getAll() {
-    return await Vendor.findAll({ order: [['id', 'ASC']] });
+  public static async getAll(params: VendorQueryParams = {}) {
+    const page = params.page && Number(params.page) > 0 ? Number(params.page) : 1;
+    const limit = params.limit && Number(params.limit) > 0 ? Number(params.limit) : 1000;
+    const offset = (page - 1) * limit;
+
+    const where: any = {};
+
+    if (params.search) {
+      const q = `%${params.search.trim()}%`;
+      where[Op.or] = [
+        { name: { [Op.iLike]: q } },
+        { contact_person: { [Op.iLike]: q } },
+        { phone: { [Op.iLike]: q } },
+        { email: { [Op.iLike]: q } },
+        { address: { [Op.iLike]: q } },
+        { tax_id: { [Op.iLike]: q } },
+      ];
+    }
+
+    if (params.name) {
+      where.name = { [Op.iLike]: `%${params.name.trim()}%` };
+    }
+
+    if (params.contact_person) {
+      where.contact_person = { [Op.iLike]: `%${params.contact_person.trim()}%` };
+    }
+
+    if (params.phone) {
+      where.phone = { [Op.iLike]: `%${params.phone.trim()}%` };
+    }
+
+    if (params.email) {
+      where.email = { [Op.iLike]: `%${params.email.trim()}%` };
+    }
+
+    const { count, rows } = await Vendor.findAndCountAll({
+      where,
+      limit,
+      offset,
+      order: [['id', 'DESC']],
+    });
+
+    return {
+      vendors: rows,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count / limit),
+    };
   }
+
 
   public static async getById(id: number) {
     const vendor = await Vendor.findByPk(id);
