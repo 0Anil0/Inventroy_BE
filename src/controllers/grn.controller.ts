@@ -262,6 +262,15 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
         );
       }
 
+      // Update ItemType.total_quantity
+      const itemTypeRecord = await ItemType.findByPk(Number(itemData.item_type_id), { transaction });
+      if (itemTypeRecord) {
+        await itemTypeRecord.update(
+          { total_quantity: (itemTypeRecord.total_quantity || 0) + receivedQtyNow },
+          { transaction }
+        );
+      }
+
       // 4. Record Stock Movement
       let locationNote = '';
       if (shelfId) {

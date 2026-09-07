@@ -357,45 +357,32 @@ export class POService {
       await item.update({ received_qty: qtyReceived });
 
       const newCentralStock = itemType.total_quantity + qtyReceived;
-      await itemType.update({ total_quantity: newCentralStock });
+      const targetProjectId = (po.project_id && po.project_id !== 0) ? Number(po.project_id) : null;
 
-      if (po.project_id) {
-        const [projInv] = await ProjectInventory.findOrCreate({
-          where: { project_id: po.project_id, item_type_id: item.item_type_id },
-          defaults: {
-            project_id: po.project_id,
-            item_type_id: item.item_type_id,
-            quantity: 0,
-            min_quantity: 10,
-          },
-        });
-
-        const oldQty = projInv.quantity;
-        const newQty = oldQty + qtyReceived;
-        await projInv.update({ quantity: newQty });
-
-        await StockMovement.create({
-          project_id: po.project_id,
+      const [projInv] = await ProjectInventory.findOrCreate({
+        where: { project_id: targetProjectId, item_type_id: item.item_type_id },
+        defaults: {
+          project_id: targetProjectId,
           item_type_id: item.item_type_id,
-          user_id: userId || null,
-          type: 'IN',
-          quantity: qtyReceived,
-          previous_quantity: oldQty,
-          new_quantity: newQty,
-          notes: `Stock Inward via ${po.po_number} (Supplier: ${vendorName})`,
-        });
-      } else {
-        await StockMovement.create({
-          project_id: (po.project_id as any) || null,
-          item_type_id: item.item_type_id,
-          user_id: userId || null,
-          type: 'IN',
-          quantity: qtyReceived,
-          previous_quantity: itemType.total_quantity - qtyReceived,
-          new_quantity: newCentralStock,
-          notes: `Central Catalog Stock Received via ${po.po_number} (Supplier: ${vendorName})`,
-        });
-      }
+          quantity: 0,
+          min_quantity: 10,
+        },
+      });
+
+      const oldQty = projInv.quantity;
+      const newQty = oldQty + qtyReceived;
+      await projInv.update({ quantity: newQty });
+
+      await StockMovement.create({
+        project_id: targetProjectId,
+        item_type_id: item.item_type_id,
+        user_id: userId || null,
+        type: 'IN',
+        quantity: qtyReceived,
+        previous_quantity: oldQty,
+        new_quantity: newQty,
+        notes: `Stock Inward via ${po.po_number} (Supplier: ${vendorName})`,
+      });
     }
 
     await po.update({ status: 'RECEIVED' });

@@ -6,6 +6,8 @@ const router = Router();
 
 router.use(authenticateToken);
 
+router.post('/inventory/clear-all', InventoryController.clearTransactionalData);
+router.get('/inventory/all', InventoryController.getAllInventory);
 router.get('/inventory/project/:projectId', InventoryController.getByProjectId);
 router.post('/inventory/adjust', InventoryController.adjustQuantity);
 router.post('/inventory/batch-adjust', InventoryController.batchAdjustQuantity);

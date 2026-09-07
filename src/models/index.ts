@@ -19,6 +19,8 @@ import { StorageShelf } from './StorageShelf';
 import { StorageRack } from './StorageRack';
 import { GoodsReceiptNote } from './GoodsReceiptNote';
 import { GoodsReceiptNoteItem } from './GoodsReceiptNoteItem';
+import { ProjectAssignment } from './ProjectAssignment';
+import { ProjectAssignmentItem } from './ProjectAssignmentItem';
 
 // User & Role Associations
 User.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
@@ -102,6 +104,13 @@ MaterialIssue.hasMany(MaterialIssueItem, { foreignKey: 'material_issue_id', as: 
 MaterialIssueItem.belongsTo(MaterialIssue, { foreignKey: 'material_issue_id', as: 'material_issue' });
 MaterialIssueItem.belongsTo(ItemType, { foreignKey: 'item_type_id', as: 'item_type' });
 
+// Project Assignment Associations
+ProjectAssignment.belongsTo(Project, { foreignKey: 'to_project_id', as: 'to_project' });
+ProjectAssignment.belongsTo(User, { foreignKey: 'created_by_user_id', as: 'user' });
+ProjectAssignment.hasMany(ProjectAssignmentItem, { foreignKey: 'assignment_id', as: 'items', onDelete: 'CASCADE' });
+ProjectAssignmentItem.belongsTo(ProjectAssignment, { foreignKey: 'assignment_id', as: 'assignment' });
+ProjectAssignmentItem.belongsTo(ItemType, { foreignKey: 'item_type_id', as: 'item_type' });
+
 export {
   sequelize,
   Role,
@@ -124,4 +133,6 @@ export {
   StorageRack,
   GoodsReceiptNote,
   GoodsReceiptNoteItem,
+  ProjectAssignment,
+  ProjectAssignmentItem,
 };

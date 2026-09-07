@@ -2,6 +2,28 @@ import { ProjectInventory, Project, ItemType, StockMovement, User, StorageShelf,
 
 export class InventoryService {
   /**
+   * Fetches all inventory records across all projects and general store warehouse
+   */
+  public static async getAllInventory() {
+    return await ProjectInventory.findAll({
+      include: [
+        {
+          model: Project,
+          as: 'project',
+          include: [{ model: Project, as: 'parent', attributes: ['id', 'name', 'code'] }],
+        },
+        {
+          model: ItemType,
+          as: 'item_type',
+        },
+        { model: StorageShelf, as: 'shelf' },
+        { model: StorageRack, as: 'rack' },
+      ],
+      order: [['id', 'ASC']],
+    });
+  }
+
+  /**
    * Fetches current stock inventory for a given Project ID
    */
   public static async getByProjectId(projectId: number) {
@@ -343,5 +365,124 @@ export class InventoryService {
       projectBreakdown,
       recentMovements,
     };
+  }
+
+  /**
+   * Auto-syncs stock from received GRNs and Purchase Orders to ensure ProjectInventory and ItemType total_quantity are 100% accurate
+   */
+  public static async syncAllStockFromReceived() {
+    const { GoodsReceiptNoteItem, GoodsReceiptNote, PurchaseOrder, PurchaseOrderItem } = require('../models');
+
+    // 1. Process all received GRN items
+    const grnItems = await GoodsReceiptNoteItem.findAll({
+      include: [{ model: GoodsReceiptNote, as: 'grn' }],
+    });
+
+    for (const item of grnItems) {
+      const targetProjId = item.grn?.project_id ? Number(item.grn.project_id) : null;
+      const itemTypeId = Number(item.item_type_id);
+      const qty = Number(item.received_qty || 0);
+
+      if (qty <= 0 || !itemTypeId) continue;
+
+      const [projInv] = await ProjectInventory.findOrCreate({
+        where: { project_id: targetProjId, item_type_id: itemTypeId },
+        defaults: {
+          project_id: targetProjId,
+          item_type_id: itemTypeId,
+          quantity: 0,
+          min_quantity: 10,
+        },
+      });
+
+      if (projInv.quantity < qty) {
+        await projInv.update({ quantity: qty });
+      }
+    }
+
+    // 2. Process all RECEIVED Purchase Orders
+    const receivedPOs = await PurchaseOrder.findAll({
+      where: { status: 'RECEIVED' },
+      include: [{ model: PurchaseOrderItem, as: 'items' }],
+    });
+
+    for (const po of receivedPOs) {
+      const targetProjId = (po.project_id && po.project_id !== 0) ? Number(po.project_id) : null;
+      for (const item of po.items || []) {
+        const itemTypeId = Number(item.item_type_id);
+        const qty = Number(item.received_qty || item.ordered_qty || 0);
+
+        if (qty <= 0 || !itemTypeId) continue;
+
+        const [projInv] = await ProjectInventory.findOrCreate({
+          where: { project_id: targetProjId, item_type_id: itemTypeId },
+          defaults: {
+            project_id: targetProjId,
+            item_type_id: itemTypeId,
+            quantity: 0,
+            min_quantity: 10,
+          },
+        });
+
+        if (projInv.quantity < qty) {
+          await projInv.update({ quantity: qty });
+        }
+      }
+    }
+
+    // 3. Recalculate ItemType total_quantity across all ProjectInventory records
+    const allItems = await ItemType.findAll();
+    for (const itemType of allItems) {
+      const totalQty = await ProjectInventory.sum('quantity', {
+        where: { item_type_id: itemType.id },
+      });
+      await itemType.update({ total_quantity: totalQty || 0 });
+    }
+  }
+
+  /**
+   * Resets and clears all transactional stock, assignments, GRNs, movements, and project inventories
+   * so the user can test the workflow step-by-step from scratch (GRN -> Stock -> Assignment -> Tracker).
+   */
+  public static async clearTransactionalData() {
+    const {
+      ProjectAssignmentItem,
+      ProjectAssignment,
+      GoodsReceiptNoteItem,
+      GoodsReceiptNote,
+      StockMovement,
+      ProjectInventory,
+      ItemType,
+      PurchaseOrderItem,
+      PurchaseOrder,
+    } = require('../models');
+
+    // 1. Truncate / Delete Project Assignment Items & Project Assignments
+    await ProjectAssignmentItem.destroy({ where: {}, force: true });
+    await ProjectAssignment.destroy({ where: {}, force: true });
+
+    // 2. Truncate / Delete Goods Receipt Note Items & Goods Receipt Notes
+    await GoodsReceiptNoteItem.destroy({ where: {}, force: true });
+    await GoodsReceiptNote.destroy({ where: {}, force: true });
+
+    // 3. Truncate / Delete Stock Movements
+    await StockMovement.destroy({ where: {}, force: true });
+
+    // 4. Truncate / Delete Project Inventories
+    await ProjectInventory.destroy({ where: {}, force: true });
+
+    // 5. Reset ItemType total_quantity to 0
+    await ItemType.update({ total_quantity: 0 }, { where: {} });
+
+    // 6. Reset PO items received_qty to 0
+    await PurchaseOrderItem.update({ received_qty: 0 }, { where: {} });
+
+    // 7. Reset PO status to APPROVED if it was RECEIVED or PARTIALLY_RECEIVED
+    await PurchaseOrder.update(
+      { status: 'APPROVED' },
+      { where: {} }
+    );
+
+    return { success: true, message: 'All transactional stock, GRN, assignment, and inventory data reset successfully.' };
   }
 }

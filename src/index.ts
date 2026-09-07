@@ -9,6 +9,7 @@ import { VendorService } from './services/vendor.service';
 import { ItemDescriptionService } from './services/item-description.service';
 import { TermsAndConditionsService } from './services/terms-and-conditions.service';
 import { POService } from './services/po.service';
+import { InventoryService } from './services/inventory.service';
 
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
@@ -28,6 +29,7 @@ import dashboardRoutes from './routes/dashboard.routes';
 import storageLocationRoutes from './routes/storage-location.routes';
 import grnRoutes from './routes/grn.routes';
 import inventoryRoutes from './routes/inventory.routes';
+import projectAssignmentRoutes from './routes/projectAssignment.routes';
 import { errorHandler } from './middlewares/error.middleware';
 
 const app = express();
@@ -59,6 +61,7 @@ app.use('/api', dashboardRoutes);
 app.use('/api', storageLocationRoutes);
 app.use('/api', inventoryRoutes);
 app.use('/api/grn', grnRoutes);
+app.use('/api/project-assignments', projectAssignmentRoutes);
 
 // Health Check Route
 app.get('/api/health', (req: Request, res: Response) => {

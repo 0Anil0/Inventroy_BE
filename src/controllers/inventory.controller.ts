@@ -2,6 +2,24 @@ import { Request, Response, NextFunction } from 'express';
 import { InventoryService } from '../services/inventory.service';
 
 export class InventoryController {
+  public static async clearTransactionalData(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await InventoryService.clearTransactionalData();
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  public static async getAllInventory(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const inventory = await InventoryService.getAllInventory();
+      res.json({ success: true, inventory });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
   public static async getByProjectId(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const rawParam = req.params.projectId;
