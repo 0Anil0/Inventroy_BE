@@ -9,6 +9,7 @@ export interface PurchaseOrderAttributes {
   po_number: string;
   vendor_id: number;
   project_id?: number | null;
+  terms_and_conditions_id?: number | null;
   status: 'DRAFT' | 'ORDERED' | 'RECEIVED' | 'CANCELLED';
   total_amount?: number;
   order_date?: Date;
@@ -21,7 +22,7 @@ export interface PurchaseOrderAttributes {
 export interface PurchaseOrderCreationAttributes
   extends Optional<
     PurchaseOrderAttributes,
-    'id' | 'project_id' | 'status' | 'total_amount' | 'order_date' | 'expected_date' | 'notes'
+    'id' | 'project_id' | 'terms_and_conditions_id' | 'status' | 'total_amount' | 'order_date' | 'expected_date' | 'notes'
   > {}
 
 export class PurchaseOrder
@@ -32,6 +33,7 @@ export class PurchaseOrder
   declare public po_number: string;
   declare public vendor_id: number;
   declare public project_id: number | null;
+  declare public terms_and_conditions_id: number | null;
   declare public status: 'DRAFT' | 'ORDERED' | 'RECEIVED' | 'CANCELLED';
   declare public total_amount: number;
   declare public order_date: Date;
@@ -43,6 +45,7 @@ export class PurchaseOrder
 
   declare public readonly vendor?: Vendor;
   declare public readonly project?: Project;
+  declare public readonly terms_and_conditions?: any;
   declare public readonly items?: PurchaseOrderItem[];
 }
 
@@ -71,6 +74,14 @@ PurchaseOrder.init(
       allowNull: true,
       references: {
         model: 'projects',
+        key: 'id',
+      },
+    },
+    terms_and_conditions_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'terms_and_conditions',
         key: 'id',
       },
     },

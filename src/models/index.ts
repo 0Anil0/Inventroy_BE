@@ -7,6 +7,13 @@ import { ItemType } from './ItemType';
 import { Vendor } from './Vendor';
 import { ItemDescription } from './ItemDescription';
 import { TermsAndConditions } from './TermsAndConditions';
+import { Project } from './Project';
+import { ProjectInventory } from './ProjectInventory';
+import { StockMovement } from './StockMovement';
+import { PurchaseOrder } from './PurchaseOrder';
+import { PurchaseOrderItem } from './PurchaseOrderItem';
+import { MaterialIssue } from './MaterialIssue';
+import { MaterialIssueItem } from './MaterialIssueItem';
 
 // User & Role Associations
 User.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
@@ -20,6 +27,41 @@ ItemType.belongsTo(Make, { foreignKey: 'make_id', as: 'make_details' });
 Unit.hasMany(ItemType, { foreignKey: 'unit_id', as: 'item_types' });
 ItemType.belongsTo(Unit, { foreignKey: 'unit_id', as: 'unit_details' });
 
+// Purchase Order Associations
+PurchaseOrder.belongsTo(Vendor, { foreignKey: 'vendor_id', as: 'vendor' });
+Vendor.hasMany(PurchaseOrder, { foreignKey: 'vendor_id', as: 'purchase_orders' });
+
+PurchaseOrder.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
+Project.hasMany(PurchaseOrder, { foreignKey: 'project_id', as: 'purchase_orders' });
+
+PurchaseOrder.belongsTo(TermsAndConditions, { foreignKey: 'terms_and_conditions_id', as: 'terms_and_conditions' });
+TermsAndConditions.hasMany(PurchaseOrder, { foreignKey: 'terms_and_conditions_id', as: 'purchase_orders' });
+
+PurchaseOrder.hasMany(PurchaseOrderItem, { foreignKey: 'po_id', as: 'items' });
+PurchaseOrderItem.belongsTo(PurchaseOrder, { foreignKey: 'po_id', as: 'purchase_order' });
+
+PurchaseOrderItem.belongsTo(ItemType, { foreignKey: 'item_type_id', as: 'item_type' });
+ItemType.hasMany(PurchaseOrderItem, { foreignKey: 'item_type_id', as: 'po_items' });
+
+// Project Inventory Associations
+ProjectInventory.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
+Project.hasMany(ProjectInventory, { foreignKey: 'project_id', as: 'inventory' });
+
+ProjectInventory.belongsTo(ItemType, { foreignKey: 'item_type_id', as: 'item_type' });
+ItemType.hasMany(ProjectInventory, { foreignKey: 'item_type_id', as: 'project_inventories' });
+
+// Stock Movement Associations
+StockMovement.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
+StockMovement.belongsTo(ItemType, { foreignKey: 'item_type_id', as: 'item_type' });
+StockMovement.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+// Material Issue Associations
+MaterialIssue.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
+MaterialIssue.belongsTo(User, { foreignKey: 'issued_by_user_id', as: 'user' });
+MaterialIssue.hasMany(MaterialIssueItem, { foreignKey: 'material_issue_id', as: 'items' });
+MaterialIssueItem.belongsTo(MaterialIssue, { foreignKey: 'material_issue_id', as: 'material_issue' });
+MaterialIssueItem.belongsTo(ItemType, { foreignKey: 'item_type_id', as: 'item_type' });
+
 export {
   sequelize,
   Role,
@@ -30,5 +72,11 @@ export {
   Vendor,
   ItemDescription,
   TermsAndConditions,
+  Project,
+  ProjectInventory,
+  StockMovement,
+  PurchaseOrder,
+  PurchaseOrderItem,
+  MaterialIssue,
+  MaterialIssueItem,
 };
-

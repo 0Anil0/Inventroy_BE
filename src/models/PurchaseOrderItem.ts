@@ -13,13 +13,18 @@ export interface PurchaseOrderItemAttributes {
   received_qty?: number;
   unit_price?: number;
   discount_percent?: number;
+  gst_percent?: number;
+  tax_amount?: number;
   total_price?: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 export interface PurchaseOrderItemCreationAttributes
-  extends Optional<PurchaseOrderItemAttributes, 'id' | 'received_qty' | 'unit_price' | 'discount_percent' | 'total_price'> {}
+  extends Optional<
+    PurchaseOrderItemAttributes,
+    'id' | 'received_qty' | 'unit_price' | 'discount_percent' | 'gst_percent' | 'tax_amount' | 'total_price'
+  > {}
 
 export class PurchaseOrderItem
   extends Model<PurchaseOrderItemAttributes, PurchaseOrderItemCreationAttributes>
@@ -35,6 +40,8 @@ export class PurchaseOrderItem
   declare public received_qty: number;
   declare public unit_price: number;
   declare public discount_percent: number;
+  declare public gst_percent: number;
+  declare public tax_amount: number;
   declare public total_price: number;
 
   declare public readonly createdAt: Date;
@@ -93,6 +100,16 @@ PurchaseOrderItem.init(
       defaultValue: 0,
     },
     discount_percent: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+      defaultValue: 0,
+    },
+    gst_percent: {
+      type: DataTypes.FLOAT,
+      allowNull: false,
+      defaultValue: 18,
+    },
+    tax_amount: {
       type: DataTypes.FLOAT,
       allowNull: false,
       defaultValue: 0,

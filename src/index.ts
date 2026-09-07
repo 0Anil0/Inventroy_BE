@@ -8,6 +8,7 @@ import { UnitService } from './services/unit.service';
 import { VendorService } from './services/vendor.service';
 import { ItemDescriptionService } from './services/item-description.service';
 import { TermsAndConditionsService } from './services/terms-and-conditions.service';
+import { POService } from './services/po.service';
 
 import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
@@ -17,6 +18,12 @@ import itemTypeRoutes from './routes/item-type.routes';
 import vendorRoutes from './routes/vendor.routes';
 import itemDescriptionRoutes from './routes/item-description.routes';
 import termsAndConditionsRoutes from './routes/terms-and-conditions.routes';
+import poRoutes from './routes/po.routes';
+import projectRoutes from './routes/project.routes';
+import materialIssueRoutes from './routes/material-issue.routes';
+import reportRoutes from './routes/report.routes';
+import stockMovementRoutes from './routes/stock-movement.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 import { errorHandler } from './middlewares/error.middleware';
 
 const app = express();
@@ -33,6 +40,12 @@ app.use('/api', itemTypeRoutes);
 app.use('/api', vendorRoutes);
 app.use('/api', itemDescriptionRoutes);
 app.use('/api', termsAndConditionsRoutes);
+app.use('/api', poRoutes);
+app.use('/api', projectRoutes);
+app.use('/api', materialIssueRoutes);
+app.use('/api', reportRoutes);
+app.use('/api', stockMovementRoutes);
+app.use('/api', dashboardRoutes);
 
 // Health Check Route
 app.get('/api/health', (req: Request, res: Response) => {
@@ -59,6 +72,7 @@ const startServer = async () => {
       await VendorService.seedDefaultVendors();
       await ItemDescriptionService.seedDefaultItemDescriptions();
       await TermsAndConditionsService.seedDefaultTerms();
+      await POService.seedDefaultPO();
     } else {
       console.warn('Database connection failed. Please check PostgreSQL server settings.');
     }

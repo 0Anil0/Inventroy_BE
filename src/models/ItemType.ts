@@ -6,11 +6,13 @@ export interface ItemTypeAttributes {
   code: string; // Item Number (input) e.g. 1001
   name: string; // Item (input) e.g. MCB
   rating?: string | null; // Item description e.g. 2A / 4P
+  switchgear_family?: string | null;
   full_description?: string | null; // Full description (input) e.g. MCB 2A 4P
   cat_no?: string | null; // Cat No (input unique) e.g. DS1A7A1
   make?: string | null; // Make (master) e.g. ABB, SCHNEIDER
   make_id?: number | null;
   unit?: string;
+  unit_id?: number | null;
   unit_rate?: number;
   discount?: number;
   total_quantity?: number;
@@ -20,18 +22,20 @@ export interface ItemTypeAttributes {
 }
 
 export interface ItemTypeCreationAttributes
-  extends Optional<ItemTypeAttributes, 'id' | 'rating' | 'full_description' | 'cat_no' | 'make' | 'make_id' | 'unit' | 'unit_rate' | 'discount' | 'total_quantity' | 'description'> {}
+  extends Optional<ItemTypeAttributes, 'id' | 'rating' | 'switchgear_family' | 'full_description' | 'cat_no' | 'make' | 'make_id' | 'unit' | 'unit_id' | 'unit_rate' | 'discount' | 'total_quantity' | 'description'> {}
 
 export class ItemType extends Model<ItemTypeAttributes, ItemTypeCreationAttributes> implements ItemTypeAttributes {
   declare public id: number;
   declare public code: string;
   declare public name: string;
   declare public rating: string | null;
+  declare public switchgear_family: string | null;
   declare public full_description: string | null;
   declare public cat_no: string | null;
   declare public make: string | null;
   declare public make_id: number | null;
   declare public unit: string;
+  declare public unit_id: number | null;
   declare public unit_rate: number;
   declare public discount: number;
   declare public total_quantity: number;
