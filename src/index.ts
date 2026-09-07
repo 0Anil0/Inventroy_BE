@@ -19,6 +19,7 @@ import vendorRoutes from './routes/vendor.routes';
 import itemDescriptionRoutes from './routes/item-description.routes';
 import termsAndConditionsRoutes from './routes/terms-and-conditions.routes';
 import poRoutes from './routes/po.routes';
+import poApproverRoutes from './routes/po-approver.routes';
 import projectRoutes from './routes/project.routes';
 import materialIssueRoutes from './routes/material-issue.routes';
 import reportRoutes from './routes/report.routes';
@@ -31,6 +32,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Health Check Route
+app.get('/api/health', (req: Request, res: Response) => {
+  res.json({ success: true, message: 'Ravi Inventory Master API is active' });
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', userRoutes);
@@ -41,6 +47,7 @@ app.use('/api', vendorRoutes);
 app.use('/api', itemDescriptionRoutes);
 app.use('/api', termsAndConditionsRoutes);
 app.use('/api', poRoutes);
+app.use('/api', poApproverRoutes);
 app.use('/api', projectRoutes);
 app.use('/api', materialIssueRoutes);
 app.use('/api', reportRoutes);
@@ -62,17 +69,26 @@ const startServer = async () => {
 
     if (connected) {
       console.log('Synchronizing Sequelize models with database...');
-      await sequelize.sync({ alter: true });
-      console.log('Sequelize models synchronized successfully.');
+      try {
+        await sequelize.sync({ alter: true });
+        console.log('Sequelize models synchronized successfully.');
+      } catch (syncErr) {
+        console.warn('Sequelize alter sync warning (continuing server startup):', syncErr);
+        await sequelize.sync();
+      }
 
       // Ensure default records exist
-      await UserService.seedRolesAndAdmin();
-      await UnitService.seedDefaultUnits();
-      await MakeService.seedDefaultMakes();
-      await VendorService.seedDefaultVendors();
-      await ItemDescriptionService.seedDefaultItemDescriptions();
-      await TermsAndConditionsService.seedDefaultTerms();
-      await POService.seedDefaultPO();
+      try {
+        await UserService.seedRolesAndAdmin();
+        await UnitService.seedDefaultUnits();
+        await MakeService.seedDefaultMakes();
+        await VendorService.seedDefaultVendors();
+        await ItemDescriptionService.seedDefaultItemDescriptions();
+        await TermsAndConditionsService.seedDefaultTerms();
+        await POService.seedDefaultPO();
+      } catch (seedErr) {
+        console.warn('Seeding warning:', seedErr);
+      }
     } else {
       console.warn('Database connection failed. Please check PostgreSQL server settings.');
     }

@@ -9,6 +9,10 @@ router.use(authenticateToken);
 router.get('/purchase-orders', POController.getAll);
 router.get('/purchase-orders/:id', POController.getById);
 router.post('/purchase-orders', POController.create);
+router.put('/purchase-orders/:id', POController.update);
+router.post('/purchase-orders/:id/approve', POController.approve);
+router.post('/purchase-orders/:id/reject', POController.reject);
 router.post('/purchase-orders/:id/receive', POController.receiveStock);
+router.delete('/purchase-orders/:id', POController.delete);
 
 export default router;

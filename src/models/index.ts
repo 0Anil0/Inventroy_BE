@@ -14,10 +14,15 @@ import { PurchaseOrder } from './PurchaseOrder';
 import { PurchaseOrderItem } from './PurchaseOrderItem';
 import { MaterialIssue } from './MaterialIssue';
 import { MaterialIssueItem } from './MaterialIssueItem';
+import { POApprover } from './POApprover';
 
 // User & Role Associations
 User.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
 Role.hasMany(User, { foreignKey: 'role_id', as: 'users' });
+
+// PO Approver Associations
+POApprover.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasOne(POApprover, { foreignKey: 'user_id', as: 'po_approver' });
 
 // Make & ItemType Associations
 Make.hasMany(ItemType, { foreignKey: 'make_id', as: 'items' });
@@ -36,6 +41,9 @@ Project.hasMany(PurchaseOrder, { foreignKey: 'project_id', as: 'purchase_orders'
 
 PurchaseOrder.belongsTo(TermsAndConditions, { foreignKey: 'terms_and_conditions_id', as: 'terms_and_conditions' });
 TermsAndConditions.hasMany(PurchaseOrder, { foreignKey: 'terms_and_conditions_id', as: 'purchase_orders' });
+
+PurchaseOrder.belongsTo(User, { foreignKey: 'created_by_id', as: 'created_by_user' });
+PurchaseOrder.belongsTo(User, { foreignKey: 'approved_by_id', as: 'approved_by_user' });
 
 PurchaseOrder.hasMany(PurchaseOrderItem, { foreignKey: 'po_id', as: 'items' });
 PurchaseOrderItem.belongsTo(PurchaseOrder, { foreignKey: 'po_id', as: 'purchase_order' });
@@ -79,4 +87,5 @@ export {
   PurchaseOrderItem,
   MaterialIssue,
   MaterialIssueItem,
+  POApprover,
 };

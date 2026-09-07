@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import {
   PurchaseOrder,
   PurchaseOrderItem,
@@ -7,13 +8,24 @@ import {
   TermsAndConditions,
   ProjectInventory,
   StockMovement,
+  User,
 } from '../models';
+import { POApproverService } from './po-approver.service';
 
 export class POService {
-  public static async getAll(filters?: { project_id?: number; vendor_id?: number }) {
+  public static async getAll(
+    filters?: { project_id?: number; vendor_id?: number },
+    currentUser?: { userId: number; role: string }
+  ) {
     const where: any = {};
     if (filters?.project_id) where.project_id = filters.project_id;
     if (filters?.vendor_id) where.vendor_id = filters.vendor_id;
+
+    // Role-based visibility check:
+    // If role is NOT ADMIN, strictly only show POs created by this user
+    if (currentUser && currentUser.role && currentUser.role.toUpperCase() !== 'ADMIN') {
+      where.created_by_id = currentUser.userId;
+    }
 
     return await PurchaseOrder.findAll({
       where,
@@ -21,6 +33,8 @@ export class POService {
         { model: Vendor, as: 'vendor' },
         { model: Project, as: 'project' },
         { model: TermsAndConditions, as: 'terms_and_conditions' },
+        { model: User, as: 'created_by_user', attributes: ['id', 'username', 'email'] },
+        { model: User, as: 'approved_by_user', attributes: ['id', 'username', 'email'] },
         {
           model: PurchaseOrderItem,
           as: 'items',
@@ -37,6 +51,8 @@ export class POService {
         { model: Vendor, as: 'vendor' },
         { model: Project, as: 'project' },
         { model: TermsAndConditions, as: 'terms_and_conditions' },
+        { model: User, as: 'created_by_user', attributes: ['id', 'username', 'email'] },
+        { model: User, as: 'approved_by_user', attributes: ['id', 'username', 'email'] },
         {
           model: PurchaseOrderItem,
           as: 'items',
@@ -48,25 +64,29 @@ export class POService {
     return po;
   }
 
-  public static async create(data: {
-    po_number?: string;
-    vendor_id: number;
-    project_id?: number;
-    terms_and_conditions_id?: number;
-    notes?: string;
-    order_date?: string;
-    expected_date?: string;
-    items: Array<{
-      item_type_id: number;
-      cat_no?: string;
-      make?: string;
-      rating?: string;
-      ordered_qty: number;
-      unit_price: number;
-      discount_percent?: number;
-      gst_percent?: number;
-    }>;
-  }) {
+  public static async create(
+    data: {
+      po_number?: string;
+      vendor_id: number;
+      project_id?: number;
+      terms_and_conditions_id?: number;
+      notes?: string;
+      order_date?: string;
+      expected_date?: string;
+      status?: string;
+      items: Array<{
+        item_type_id: number;
+        cat_no?: string;
+        make?: string;
+        rating?: string;
+        ordered_qty: number;
+        unit_price: number;
+        discount_percent?: number;
+        gst_percent?: number;
+      }>;
+    },
+    createdById?: number
+  ) {
     const count = await PurchaseOrder.count();
     const poNumber = data.po_number || `EEEA/26-27/${String(count + 1).padStart(2, '0')}`;
 
@@ -99,15 +119,16 @@ export class POService {
       });
     }
 
-    const grandTotal = subtotalSum + totalTaxSum;
+    const initialStatus = data.status || 'PENDING_APPROVAL';
 
     const po = await PurchaseOrder.create({
       po_number: poNumber,
       vendor_id: data.vendor_id,
       project_id: data.project_id || null,
       terms_and_conditions_id: data.terms_and_conditions_id || null,
-      status: 'ORDERED',
-      total_amount: Math.round(subtotalSum), // basic amount
+      created_by_id: createdById || null,
+      status: initialStatus as any,
+      total_amount: Math.round(subtotalSum),
       order_date: data.order_date ? new Date(data.order_date) : new Date(),
       expected_date: data.expected_date ? new Date(data.expected_date) : null,
       notes: data.notes || null,
@@ -123,10 +144,139 @@ export class POService {
     return await this.getById(po.id);
   }
 
+  public static async update(
+    id: number,
+    data: {
+      po_number?: string;
+      vendor_id?: number;
+      project_id?: number;
+      terms_and_conditions_id?: number;
+      notes?: string;
+      order_date?: string;
+      expected_date?: string;
+      items?: Array<{
+        item_type_id: number;
+        cat_no?: string;
+        make?: string;
+        rating?: string;
+        ordered_qty: number;
+        unit_price: number;
+        discount_percent?: number;
+        gst_percent?: number;
+      }>;
+    },
+    currentUser?: { userId: number; role: string }
+  ) {
+    const po = await PurchaseOrder.findByPk(id);
+    if (!po) throw new Error('Purchase order not found');
+
+    // Rule: Approved or Received Purchase Orders CANNOT be edited!
+    if (po.status === 'APPROVED' || po.status === 'RECEIVED') {
+      throw new Error('This Purchase Order is already APPROVED or RECEIVED and cannot be edited');
+    }
+
+    // Permission check for non-admin user editing PO created by someone else
+    if (currentUser && currentUser.role.toUpperCase() !== 'ADMIN' && po.created_by_id && po.created_by_id !== currentUser.userId) {
+      throw new Error('You can only edit Purchase Orders created by you');
+    }
+
+    let subtotalSum = po.total_amount || 0;
+
+    if (data.items && Array.isArray(data.items) && data.items.length > 0) {
+      subtotalSum = 0;
+      let totalTaxSum = 0;
+      const itemsPayload = [];
+
+      for (const i of data.items) {
+        const disc = i.discount_percent || 0;
+        const gst = i.gst_percent !== undefined ? i.gst_percent : 18;
+        const gross = i.ordered_qty * i.unit_price;
+        const lineSubtotal = gross - gross * (disc / 100);
+        const lineTax = lineSubtotal * (gst / 100);
+
+        subtotalSum += lineSubtotal;
+        totalTaxSum += lineTax;
+
+        itemsPayload.push({
+          item_type_id: i.item_type_id,
+          cat_no: i.cat_no || null,
+          make: i.make || null,
+          rating: i.rating || null,
+          ordered_qty: i.ordered_qty,
+          received_qty: 0,
+          unit_price: i.unit_price,
+          discount_percent: disc,
+          gst_percent: gst,
+          tax_amount: lineTax,
+          total_price: lineSubtotal,
+        });
+      }
+
+      // Delete existing line items & replace
+      await PurchaseOrderItem.destroy({ where: { po_id: id } });
+
+      for (const itemData of itemsPayload) {
+        await PurchaseOrderItem.create({
+          po_id: id,
+          ...itemData,
+        });
+      }
+    }
+
+    await po.update({
+      vendor_id: data.vendor_id || po.vendor_id,
+      project_id: data.project_id !== undefined ? data.project_id : po.project_id,
+      terms_and_conditions_id: data.terms_and_conditions_id !== undefined ? data.terms_and_conditions_id : po.terms_and_conditions_id,
+      notes: data.notes !== undefined ? data.notes : po.notes,
+      expected_date: data.expected_date ? new Date(data.expected_date) : po.expected_date,
+      order_date: data.order_date ? new Date(data.order_date) : po.order_date,
+      total_amount: Math.round(subtotalSum),
+    });
+
+    return await this.getById(id);
+  }
+
+  public static async approve(id: number, userId: number, roleName: string) {
+    const isApprover = await POApproverService.isUserApprover(userId, roleName);
+    if (!isApprover) {
+      throw new Error('You are not an authorized PO approver');
+    }
+
+    const po = await PurchaseOrder.findByPk(id);
+    if (!po) throw new Error('Purchase order not found');
+
+    if (po.status === 'APPROVED') {
+      throw new Error('Purchase order is already approved');
+    }
+
+    await po.update({
+      status: 'APPROVED',
+      approved_by_id: userId,
+      approved_at: new Date(),
+    });
+
+    return await this.getById(id);
+  }
+
+  public static async reject(id: number, userId: number, roleName: string) {
+    const isApprover = await POApproverService.isUserApprover(userId, roleName);
+    if (!isApprover) {
+      throw new Error('You are not an authorized PO approver');
+    }
+
+    const po = await PurchaseOrder.findByPk(id);
+    if (!po) throw new Error('Purchase order not found');
+
+    await po.update({
+      status: 'REJECTED',
+    });
+
+    return await this.getById(id);
+  }
+
   public static async seedDefaultPO() {
     const count = await PurchaseOrder.count();
     if (count === 0) {
-      // Find or create Vendor AMTECH INDIA
       let vendor = await Vendor.findOne({ where: { name: 'AMTECH INDIA' } });
       if (!vendor) {
         vendor = await Vendor.create({
@@ -139,7 +289,6 @@ export class POService {
         });
       }
 
-      // Ensure item types exist for PO line items
       const poItemsDef = [
         { name: 'Heavy duty Plug 16A 5 Pin 415 VAC', code: 'ITM-AM-01', cat_no: 'DS1A7A1', make: 'ABB', unit: 'pcs', unit_price: 2025, discount_percent: 43.5, gst_percent: 18, ordered_qty: 40 },
         { name: 'Heavy duty Socket 16A 5 Pin 415 VAC', code: 'ITM-AM-02', cat_no: 'DS1B7A1', make: 'ABB', unit: 'pcs', unit_price: 2510, discount_percent: 43.5, gst_percent: 18, ordered_qty: 40 },
@@ -182,6 +331,7 @@ export class POService {
         vendor_id: vendor.id,
         order_date: '2026-07-24',
         notes: 'Project No. 1000104 - Heavy Duty Plugs & Sockets Supply',
+        status: 'APPROVED',
         items: itemsPayload,
       });
 
@@ -204,14 +354,11 @@ export class POService {
 
       const qtyReceived = item.ordered_qty;
 
-      // Update received_qty in PO item line
       await item.update({ received_qty: qtyReceived });
 
-      // Increase Central Master Stock in ItemType
       const newCentralStock = itemType.total_quantity + qtyReceived;
       await itemType.update({ total_quantity: newCentralStock });
 
-      // If PO was allocated to a Project, increase Project Stock
       if (po.project_id) {
         const [projInv] = await ProjectInventory.findOrCreate({
           where: { project_id: po.project_id, item_type_id: item.item_type_id },
@@ -227,7 +374,6 @@ export class POService {
         const newQty = oldQty + qtyReceived;
         await projInv.update({ quantity: newQty });
 
-        // Record Document-linked Audit Log
         await StockMovement.create({
           project_id: po.project_id,
           item_type_id: item.item_type_id,
@@ -239,7 +385,6 @@ export class POService {
           notes: `Stock Inward via ${po.po_number} (Supplier: ${vendorName})`,
         });
       } else {
-        // Log movement for central warehouse stock
         await StockMovement.create({
           project_id: (po.project_id as any) || null,
           item_type_id: item.item_type_id,
@@ -255,5 +400,20 @@ export class POService {
 
     await po.update({ status: 'RECEIVED' });
     return await this.getById(poId);
+  }
+
+  public static async delete(id: number, currentUser?: { userId: number; role: string }) {
+    const po = await PurchaseOrder.findByPk(id);
+    if (!po) throw new Error('Purchase order not found');
+
+    if (currentUser && currentUser.role.toUpperCase() !== 'ADMIN') {
+      if (po.created_by_id && po.created_by_id !== currentUser.userId) {
+        throw new Error('You can only delete Purchase Orders created by you');
+      }
+    }
+
+    await PurchaseOrderItem.destroy({ where: { po_id: id } });
+    await po.destroy();
+    return { success: true, message: 'Purchase Order deleted successfully' };
   }
 }

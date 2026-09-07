@@ -3,6 +3,9 @@ import { sequelize } from '../config/database';
 import { Vendor } from './Vendor';
 import { Project } from './Project';
 import { PurchaseOrderItem } from './PurchaseOrderItem';
+import { User } from './User';
+
+export type POStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'ORDERED' | 'RECEIVED' | 'CANCELLED' | 'REJECTED';
 
 export interface PurchaseOrderAttributes {
   id: number;
@@ -10,7 +13,10 @@ export interface PurchaseOrderAttributes {
   vendor_id: number;
   project_id?: number | null;
   terms_and_conditions_id?: number | null;
-  status: 'DRAFT' | 'ORDERED' | 'RECEIVED' | 'CANCELLED';
+  created_by_id?: number | null;
+  approved_by_id?: number | null;
+  approved_at?: Date | null;
+  status: POStatus;
   total_amount?: number;
   order_date?: Date;
   expected_date?: Date | null;
@@ -22,7 +28,17 @@ export interface PurchaseOrderAttributes {
 export interface PurchaseOrderCreationAttributes
   extends Optional<
     PurchaseOrderAttributes,
-    'id' | 'project_id' | 'terms_and_conditions_id' | 'status' | 'total_amount' | 'order_date' | 'expected_date' | 'notes'
+    | 'id'
+    | 'project_id'
+    | 'terms_and_conditions_id'
+    | 'created_by_id'
+    | 'approved_by_id'
+    | 'approved_at'
+    | 'status'
+    | 'total_amount'
+    | 'order_date'
+    | 'expected_date'
+    | 'notes'
   > {}
 
 export class PurchaseOrder
@@ -34,7 +50,10 @@ export class PurchaseOrder
   declare public vendor_id: number;
   declare public project_id: number | null;
   declare public terms_and_conditions_id: number | null;
-  declare public status: 'DRAFT' | 'ORDERED' | 'RECEIVED' | 'CANCELLED';
+  declare public created_by_id: number | null;
+  declare public approved_by_id: number | null;
+  declare public approved_at: Date | null;
+  declare public status: POStatus;
   declare public total_amount: number;
   declare public order_date: Date;
   declare public expected_date: Date | null;
@@ -47,6 +66,8 @@ export class PurchaseOrder
   declare public readonly project?: Project;
   declare public readonly terms_and_conditions?: any;
   declare public readonly items?: PurchaseOrderItem[];
+  declare public readonly created_by_user?: User;
+  declare public readonly approved_by_user?: User;
 }
 
 PurchaseOrder.init(
@@ -85,10 +106,30 @@ PurchaseOrder.init(
         key: 'id',
       },
     },
+    created_by_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id',
+      },
+    },
+    approved_by_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id',
+      },
+    },
+    approved_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
     status: {
-      type: DataTypes.ENUM('DRAFT', 'ORDERED', 'RECEIVED', 'CANCELLED'),
+      type: DataTypes.STRING(30),
       allowNull: false,
-      defaultValue: 'ORDERED',
+      defaultValue: 'PENDING_APPROVAL',
     },
     total_amount: {
       type: DataTypes.FLOAT,
