@@ -1,22 +1,27 @@
-import { ProjectInventory, Project, ItemType, StockMovement, User } from '../models';
+import { ProjectInventory, Project, ItemType, StockMovement, User, StorageShelf, StorageRack } from '../models';
 
 export class InventoryService {
   /**
    * Fetches current stock inventory for a given Project ID
    */
   public static async getByProjectId(projectId: number) {
-    const project = await Project.findByPk(projectId);
-    if (!project) {
-      throw new Error('Project not found');
-    }
+    const whereClause = (!projectId || projectId === 0 || isNaN(projectId)) ? { project_id: null } : { project_id: projectId };
 
     return await ProjectInventory.findAll({
-      where: { project_id: projectId },
+      where: whereClause,
       include: [
         {
           model: ItemType,
           as: 'item_type',
           attributes: ['id', 'name', 'code', 'unit', 'total_quantity', 'description'],
+        },
+        {
+          model: StorageShelf,
+          as: 'shelf',
+        },
+        {
+          model: StorageRack,
+          as: 'rack',
         },
       ],
       order: [['id', 'ASC']],
@@ -39,16 +44,22 @@ export class InventoryService {
   }) {
     const { project_id, item_type_id, amount, min_quantity, adjustment_type, user_id, notes } = data;
 
-    const project = await Project.findByPk(project_id);
-    if (!project) throw new Error('Project not found');
+    const targetProjectId = (project_id && project_id !== 0) ? project_id : null;
+    let projectName = 'General Stock / Main Store';
+
+    if (targetProjectId) {
+      const project = await Project.findByPk(targetProjectId);
+      if (!project) throw new Error('Project not found');
+      projectName = project.name;
+    }
 
     const itemType = await ItemType.findByPk(item_type_id);
     if (!itemType) throw new Error('Item type not found');
 
     const [record] = await ProjectInventory.findOrCreate({
-      where: { project_id, item_type_id },
+      where: { project_id: targetProjectId, item_type_id },
       defaults: {
-        project_id,
+        project_id: targetProjectId,
         item_type_id,
         quantity: 0,
         min_quantity: min_quantity !== undefined ? min_quantity : 0,
@@ -64,17 +75,7 @@ export class InventoryService {
       targetProjectQty = Math.max(0, oldProjectQty - amount);
     }
 
-    const diff = targetProjectQty - oldProjectQty; // Positive = allocating TO project, Negative = returning TO central
-
-    if (diff > 0 && itemType.total_quantity < diff) {
-      throw new Error(
-        `Cannot allocate ${diff} ${itemType.unit} to project. Central Warehouse only has ${itemType.total_quantity} ${itemType.unit} available.`
-      );
-    }
-
-    // Deduct allocated amount from Central Warehouse Stock, or return stock to Central Warehouse if diff < 0
-    const newCentralStock = Math.max(0, itemType.total_quantity - diff);
-    await itemType.update({ total_quantity: newCentralStock });
+    const diff = targetProjectQty - oldProjectQty;
 
     // Update project inventory record
     const updateFields: any = { quantity: targetProjectQty };
@@ -90,14 +91,14 @@ export class InventoryService {
         diff > 0 ? 'IN' : diff < 0 ? 'OUT' : 'SET';
 
       await StockMovement.create({
-        project_id,
+        project_id: targetProjectId,
         item_type_id,
         user_id: user_id || null,
         type: movementType,
         quantity: Math.abs(diff),
         previous_quantity: oldProjectQty,
         new_quantity: targetProjectQty,
-        notes: notes || `Allocated ${diff > 0 ? '+' : ''}${diff} ${itemType.unit} from Central Warehouse to ${project.name}`,
+        notes: notes || `Updated ${diff > 0 ? '+' : ''}${diff} ${itemType.unit} for ${projectName}`,
       });
     }
 
@@ -107,6 +108,14 @@ export class InventoryService {
           model: ItemType,
           as: 'item_type',
           attributes: ['id', 'name', 'code', 'unit', 'total_quantity', 'description'],
+        },
+        {
+          model: StorageShelf,
+          as: 'shelf',
+        },
+        {
+          model: StorageRack,
+          as: 'rack',
         },
       ],
     });
@@ -128,8 +137,11 @@ export class InventoryService {
   }) {
     const { project_id, items, user_id, notes } = data;
 
-    const project = await Project.findByPk(project_id);
-    if (!project) throw new Error('Project not found');
+    const targetProjectId = (project_id && project_id !== 0) ? project_id : null;
+    if (targetProjectId) {
+      const project = await Project.findByPk(targetProjectId);
+      if (!project) throw new Error('Project not found');
+    }
 
     const results = [];
     for (const item of items) {
@@ -162,8 +174,11 @@ export class InventoryService {
   }) {
     const { from_project_id, to_project_id, item_type_id, quantity, user_id, notes } = data;
 
-    if (from_project_id === to_project_id) {
-      throw new Error('Source and destination projects must be different');
+    const fromTargetId = (from_project_id && from_project_id !== 0) ? from_project_id : null;
+    const toTargetId = (to_project_id && to_project_id !== 0) ? to_project_id : null;
+
+    if (fromTargetId === toTargetId) {
+      throw new Error('Source and destination locations must be different');
     }
 
     if (quantity <= 0) {
@@ -171,43 +186,45 @@ export class InventoryService {
     }
 
     const sourceInventory = await ProjectInventory.findOne({
-      where: { project_id: from_project_id, item_type_id },
+      where: { project_id: fromTargetId, item_type_id },
       include: [{ model: ItemType, as: 'item_type' }],
     });
 
     if (!sourceInventory || sourceInventory.quantity < quantity) {
       throw new Error(
-        `Insufficient stock in source project. Available: ${sourceInventory?.quantity || 0}`
+        `Insufficient stock in source location. Available: ${sourceInventory?.quantity || 0}`
       );
     }
 
-    const fromProject = await Project.findByPk(from_project_id);
-    const toProject = await Project.findByPk(to_project_id);
-    if (!fromProject || !toProject) throw new Error('Project not found');
+    const fromProject = fromTargetId ? await Project.findByPk(fromTargetId) : null;
+    const toProject = toTargetId ? await Project.findByPk(toTargetId) : null;
+
+    const fromName = fromProject ? fromProject.name : 'General Stock / Main Store';
+    const toName = toProject ? toProject.name : 'General Stock / Main Store';
 
     const itemType = sourceInventory.item_type || (await ItemType.findByPk(item_type_id));
 
-    // Deduct from Source Project
+    // Deduct from Source Location
     const oldSourceQty = sourceInventory.quantity;
     const newSourceQty = oldSourceQty - quantity;
     await sourceInventory.update({ quantity: newSourceQty });
 
     await StockMovement.create({
-      project_id: from_project_id,
+      project_id: fromTargetId,
       item_type_id,
       user_id: user_id || null,
       type: 'TRANSFER',
       quantity,
       previous_quantity: oldSourceQty,
       new_quantity: newSourceQty,
-      notes: notes || `Transferred ${quantity} ${itemType?.unit || 'units'} to ${toProject.name}`,
+      notes: notes || `Transferred ${quantity} ${itemType?.unit || 'units'} to ${toName}`,
     });
 
-    // Add to Destination Project
+    // Add to Destination Location
     const [destInventory] = await ProjectInventory.findOrCreate({
-      where: { project_id: to_project_id, item_type_id },
+      where: { project_id: toTargetId, item_type_id },
       defaults: {
-        project_id: to_project_id,
+        project_id: toTargetId,
         item_type_id,
         quantity: 0,
         min_quantity: 0,
@@ -219,22 +236,30 @@ export class InventoryService {
     await destInventory.update({ quantity: newDestQty });
 
     await StockMovement.create({
-      project_id: to_project_id,
+      project_id: toTargetId,
       item_type_id,
       user_id: user_id || null,
       type: 'TRANSFER',
       quantity,
       previous_quantity: oldDestQty,
       new_quantity: newDestQty,
-      notes: notes || `Received ${quantity} ${itemType?.unit || 'units'} from ${fromProject.name}`,
+      notes: notes || `Received ${quantity} ${itemType?.unit || 'units'} from ${fromName}`,
     });
 
     return {
       source: await ProjectInventory.findByPk(sourceInventory.id, {
-        include: [{ model: ItemType, as: 'item_type' }],
+        include: [
+          { model: ItemType, as: 'item_type' },
+          { model: StorageShelf, as: 'shelf' },
+          { model: StorageRack, as: 'rack' },
+        ],
       }),
       destination: await ProjectInventory.findByPk(destInventory.id, {
-        include: [{ model: ItemType, as: 'item_type' }],
+        include: [
+          { model: ItemType, as: 'item_type' },
+          { model: StorageShelf, as: 'shelf' },
+          { model: StorageRack, as: 'rack' },
+        ],
       }),
     };
   }
@@ -248,7 +273,9 @@ export class InventoryService {
     limit?: number;
   }) {
     const where: any = {};
-    if (filters?.project_id) where.project_id = filters.project_id;
+    if (filters?.project_id !== undefined && filters?.project_id !== null) {
+      where.project_id = (filters.project_id === 0 ? null : filters.project_id);
+    }
     if (filters?.item_type_id) where.item_type_id = filters.item_type_id;
 
     return await StockMovement.findAll({

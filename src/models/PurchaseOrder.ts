@@ -5,7 +5,7 @@ import { Project } from './Project';
 import { PurchaseOrderItem } from './PurchaseOrderItem';
 import { User } from './User';
 
-export type POStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'ORDERED' | 'RECEIVED' | 'CANCELLED' | 'REJECTED';
+export type POStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'ORDERED' | 'PARTIALLY_RECEIVED' | 'RECEIVED' | 'CANCELLED' | 'REJECTED';
 
 export interface PurchaseOrderAttributes {
   id: number;

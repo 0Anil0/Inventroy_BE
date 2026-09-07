@@ -4,7 +4,12 @@ import { InventoryService } from '../services/inventory.service';
 export class InventoryController {
   public static async getByProjectId(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const projectId = parseInt(String(req.params.projectId), 10);
+      const rawParam = req.params.projectId;
+      let projectId = 0;
+      if (rawParam && rawParam !== '0' && rawParam !== 'general') {
+        const parsed = parseInt(String(rawParam), 10);
+        if (!isNaN(parsed)) projectId = parsed;
+      }
       const inventory = await InventoryService.getByProjectId(projectId);
       res.json({ success: true, inventory });
     } catch (error: any) {
@@ -19,7 +24,7 @@ export class InventoryController {
 
       const qtyVal = amount !== undefined ? amount : quantity;
 
-      if (!project_id || !item_type_id || qtyVal === undefined) {
+      if (project_id === undefined || project_id === null || !item_type_id || qtyVal === undefined) {
         res.status(400).json({
           success: false,
           message: 'project_id, item_type_id, and quantity are required',

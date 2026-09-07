@@ -6,7 +6,7 @@ import { User } from './User';
 
 export interface StockMovementAttributes {
   id: number;
-  project_id: number;
+  project_id?: number | null;
   item_type_id: number;
   user_id?: number | null;
   type: 'IN' | 'OUT' | 'SET' | 'TRANSFER';
@@ -19,14 +19,14 @@ export interface StockMovementAttributes {
 }
 
 export interface StockMovementCreationAttributes
-  extends Optional<StockMovementAttributes, 'id' | 'user_id' | 'notes'> {}
+  extends Optional<StockMovementAttributes, 'id' | 'project_id' | 'user_id' | 'notes'> {}
 
 export class StockMovement
   extends Model<StockMovementAttributes, StockMovementCreationAttributes>
   implements StockMovementAttributes
 {
   declare public id: number;
-  declare public project_id: number;
+  declare public project_id: number | null;
   declare public item_type_id: number;
   declare public user_id: number | null;
   declare public type: 'IN' | 'OUT' | 'SET' | 'TRANSFER';

@@ -17,6 +17,8 @@ import { MaterialIssueItem } from './MaterialIssueItem';
 import { POApprover } from './POApprover';
 import { StorageShelf } from './StorageShelf';
 import { StorageRack } from './StorageRack';
+import { GoodsReceiptNote } from './GoodsReceiptNote';
+import { GoodsReceiptNoteItem } from './GoodsReceiptNoteItem';
 
 // User & Role Associations
 User.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
@@ -57,12 +59,32 @@ PurchaseOrderItem.belongsTo(PurchaseOrder, { foreignKey: 'po_id', as: 'purchase_
 PurchaseOrderItem.belongsTo(ItemType, { foreignKey: 'item_type_id', as: 'item_type' });
 ItemType.hasMany(PurchaseOrderItem, { foreignKey: 'item_type_id', as: 'po_items' });
 
+// Goods Receipt Note (GRN) Associations
+GoodsReceiptNote.belongsTo(PurchaseOrder, { foreignKey: 'po_id', as: 'purchase_order' });
+PurchaseOrder.hasMany(GoodsReceiptNote, { foreignKey: 'po_id', as: 'grns' });
+
+GoodsReceiptNote.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
+Project.hasMany(GoodsReceiptNote, { foreignKey: 'project_id', as: 'grns' });
+
+GoodsReceiptNote.belongsTo(User, { foreignKey: 'received_by_id', as: 'received_by_user' });
+
+GoodsReceiptNote.hasMany(GoodsReceiptNoteItem, { foreignKey: 'grn_id', as: 'items', onDelete: 'CASCADE' });
+GoodsReceiptNoteItem.belongsTo(GoodsReceiptNote, { foreignKey: 'grn_id', as: 'grn' });
+
+GoodsReceiptNoteItem.belongsTo(PurchaseOrderItem, { foreignKey: 'po_item_id', as: 'po_item' });
+GoodsReceiptNoteItem.belongsTo(ItemType, { foreignKey: 'item_type_id', as: 'item_type' });
+GoodsReceiptNoteItem.belongsTo(StorageShelf, { foreignKey: 'shelf_id', as: 'shelf' });
+GoodsReceiptNoteItem.belongsTo(StorageRack, { foreignKey: 'rack_id', as: 'rack' });
+
 // Project Inventory Associations
 ProjectInventory.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
 Project.hasMany(ProjectInventory, { foreignKey: 'project_id', as: 'inventory' });
 
 ProjectInventory.belongsTo(ItemType, { foreignKey: 'item_type_id', as: 'item_type' });
 ItemType.hasMany(ProjectInventory, { foreignKey: 'item_type_id', as: 'project_inventories' });
+
+ProjectInventory.belongsTo(StorageShelf, { foreignKey: 'shelf_id', as: 'shelf' });
+ProjectInventory.belongsTo(StorageRack, { foreignKey: 'rack_id', as: 'rack' });
 
 // Stock Movement Associations
 StockMovement.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
@@ -96,4 +118,6 @@ export {
   POApprover,
   StorageShelf,
   StorageRack,
+  GoodsReceiptNote,
+  GoodsReceiptNoteItem,
 };

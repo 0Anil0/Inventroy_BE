@@ -26,6 +26,8 @@ import reportRoutes from './routes/report.routes';
 import stockMovementRoutes from './routes/stock-movement.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import storageLocationRoutes from './routes/storage-location.routes';
+import grnRoutes from './routes/grn.routes';
+import inventoryRoutes from './routes/inventory.routes';
 import { errorHandler } from './middlewares/error.middleware';
 
 const app = express();
@@ -55,6 +57,8 @@ app.use('/api', reportRoutes);
 app.use('/api', stockMovementRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api', storageLocationRoutes);
+app.use('/api', inventoryRoutes);
+app.use('/api/grn', grnRoutes);
 
 // Health Check Route
 app.get('/api/health', (req: Request, res: Response) => {
@@ -77,6 +81,31 @@ const startServer = async () => {
       } catch (syncErr) {
         console.warn('Sequelize alter sync warning (continuing server startup):', syncErr);
         await sequelize.sync();
+      }
+
+      // Execute SQL fixes for nullable columns to support general stock (null project_id) & optional storage binding
+      const alterQueries = [
+        'ALTER TABLE "goods_receipt_notes" ALTER COLUMN "project_id" DROP NOT NULL;',
+        'ALTER TABLE "goods_receipt_notes" ALTER COLUMN "challan_no" DROP NOT NULL;',
+        'ALTER TABLE "goods_receipt_notes" ALTER COLUMN "vehicle_no" DROP NOT NULL;',
+        'ALTER TABLE "goods_receipt_notes" ALTER COLUMN "received_by_id" DROP NOT NULL;',
+        'ALTER TABLE "goods_receipt_notes" ALTER COLUMN "remarks" DROP NOT NULL;',
+        'ALTER TABLE "goods_receipt_note_items" ALTER COLUMN "po_item_id" DROP NOT NULL;',
+        'ALTER TABLE "goods_receipt_note_items" ALTER COLUMN "shelf_id" DROP NOT NULL;',
+        'ALTER TABLE "goods_receipt_note_items" ALTER COLUMN "rack_id" DROP NOT NULL;',
+        'ALTER TABLE "goods_receipt_note_items" ALTER COLUMN "notes" DROP NOT NULL;',
+        'ALTER TABLE "project_inventories" ALTER COLUMN "project_id" DROP NOT NULL;',
+        'ALTER TABLE "project_inventories" ALTER COLUMN "shelf_id" DROP NOT NULL;',
+        'ALTER TABLE "project_inventories" ALTER COLUMN "rack_id" DROP NOT NULL;',
+        'ALTER TABLE "stock_movements" ALTER COLUMN "project_id" DROP NOT NULL;',
+      ];
+
+      for (const q of alterQueries) {
+        try {
+          await sequelize.query(q);
+        } catch (qErr) {
+          // Column may already be nullable, ignore error
+        }
       }
 
       // Ensure default records exist
