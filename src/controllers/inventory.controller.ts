@@ -53,7 +53,7 @@ export class InventoryController {
       const { project_id, items, notes } = req.body;
       const userId = (req as any).user?.id;
 
-      if (!project_id || !Array.isArray(items) || items.length === 0) {
+      if (project_id === undefined || project_id === null || !Array.isArray(items) || items.length === 0) {
         res.status(400).json({
           success: false,
           message: 'project_id and a non-empty array of items are required',
@@ -83,7 +83,14 @@ export class InventoryController {
       const { from_project_id, to_project_id, item_type_id, quantity, notes } = req.body;
       const userId = (req as any).user?.id;
 
-      if (!from_project_id || !to_project_id || !item_type_id || !quantity) {
+      if (
+        from_project_id === undefined ||
+        from_project_id === null ||
+        to_project_id === undefined ||
+        to_project_id === null ||
+        !item_type_id ||
+        !quantity
+      ) {
         res.status(400).json({
           success: false,
           message: 'from_project_id, to_project_id, item_type_id, and quantity are required',
