@@ -25,6 +25,7 @@ import materialIssueRoutes from './routes/material-issue.routes';
 import reportRoutes from './routes/report.routes';
 import stockMovementRoutes from './routes/stock-movement.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import storageLocationRoutes from './routes/storage-location.routes';
 import { errorHandler } from './middlewares/error.middleware';
 
 const app = express();
@@ -53,6 +54,7 @@ app.use('/api', materialIssueRoutes);
 app.use('/api', reportRoutes);
 app.use('/api', stockMovementRoutes);
 app.use('/api', dashboardRoutes);
+app.use('/api', storageLocationRoutes);
 
 // Health Check Route
 app.get('/api/health', (req: Request, res: Response) => {

@@ -15,10 +15,16 @@ import { PurchaseOrderItem } from './PurchaseOrderItem';
 import { MaterialIssue } from './MaterialIssue';
 import { MaterialIssueItem } from './MaterialIssueItem';
 import { POApprover } from './POApprover';
+import { StorageShelf } from './StorageShelf';
+import { StorageRack } from './StorageRack';
 
 // User & Role Associations
 User.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
 Role.hasMany(User, { foreignKey: 'role_id', as: 'users' });
+
+// Storage Location Associations
+StorageShelf.hasMany(StorageRack, { foreignKey: 'shelf_id', as: 'racks', onDelete: 'CASCADE' });
+StorageRack.belongsTo(StorageShelf, { foreignKey: 'shelf_id', as: 'shelf' });
 
 // PO Approver Associations
 POApprover.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
@@ -88,4 +94,6 @@ export {
   MaterialIssue,
   MaterialIssueItem,
   POApprover,
+  StorageShelf,
+  StorageRack,
 };
