@@ -98,6 +98,9 @@ const startServer = async () => {
         'ALTER TABLE "project_inventories" ALTER COLUMN "shelf_id" DROP NOT NULL;',
         'ALTER TABLE "project_inventories" ALTER COLUMN "rack_id" DROP NOT NULL;',
         'ALTER TABLE "stock_movements" ALTER COLUMN "project_id" DROP NOT NULL;',
+        'ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "parent_id" INTEGER;',
+        'ALTER TABLE "projects" DROP CONSTRAINT IF EXISTS "projects_parent_id_fkey";',
+        'ALTER TABLE "projects" ADD CONSTRAINT "projects_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "projects"("id") ON DELETE CASCADE;',
       ];
 
       for (const q of alterQueries) {

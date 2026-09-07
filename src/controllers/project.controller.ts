@@ -13,12 +13,12 @@ export class ProjectController {
 
   public static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { name, code, location, description } = req.body;
+      const { name, code, location, description, parent_id } = req.body;
       if (!name || !code) {
         res.status(400).json({ success: false, message: 'Name and Code are required' });
         return;
       }
-      const project = await ProjectService.create({ name, code, location, description });
+      const project = await ProjectService.create({ name, code, location, description, parent_id });
       res.status(201).json({ success: true, project });
     } catch (error: any) {
       res.status(400).json({ success: false, message: error.message });

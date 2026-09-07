@@ -7,11 +7,12 @@ export interface ProjectAttributes {
   code: string;
   location?: string | null;
   description?: string | null;
+  parent_id?: number | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-export interface ProjectCreationAttributes extends Optional<ProjectAttributes, 'id' | 'location' | 'description'> {}
+export interface ProjectCreationAttributes extends Optional<ProjectAttributes, 'id' | 'location' | 'description' | 'parent_id'> {}
 
 export class Project extends Model<ProjectAttributes, ProjectCreationAttributes> implements ProjectAttributes {
   declare public id: number;
@@ -19,9 +20,13 @@ export class Project extends Model<ProjectAttributes, ProjectCreationAttributes>
   declare public code: string;
   declare public location: string | null;
   declare public description: string | null;
+  declare public parent_id: number | null;
 
   declare public readonly createdAt: Date;
   declare public readonly updatedAt: Date;
+
+  declare public readonly parent?: Project;
+  declare public readonly sub_projects?: Project[];
 }
 
 Project.init(
@@ -47,6 +52,14 @@ Project.init(
     description: {
       type: DataTypes.STRING(255),
       allowNull: true,
+    },
+    parent_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'projects',
+        key: 'id',
+      },
     },
   },
   {

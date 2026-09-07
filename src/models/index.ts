@@ -47,6 +47,10 @@ Vendor.hasMany(PurchaseOrder, { foreignKey: 'vendor_id', as: 'purchase_orders' }
 PurchaseOrder.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
 Project.hasMany(PurchaseOrder, { foreignKey: 'project_id', as: 'purchase_orders' });
 
+// Project Parent-Child Hierarchy Associations
+Project.belongsTo(Project, { foreignKey: 'parent_id', as: 'parent' });
+Project.hasMany(Project, { foreignKey: 'parent_id', as: 'sub_projects' });
+
 PurchaseOrder.belongsTo(TermsAndConditions, { foreignKey: 'terms_and_conditions_id', as: 'terms_and_conditions' });
 TermsAndConditions.hasMany(PurchaseOrder, { foreignKey: 'terms_and_conditions_id', as: 'purchase_orders' });
 
