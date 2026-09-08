@@ -229,10 +229,10 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
         }
       }
 
-      // 3. Update / Upsert ProjectInventory (Match by Project Site & Item Type Code)
+      // 3. Update / Upsert Central Warehouse Inventory (Always project_id = null)
       const existingInventory = await ProjectInventory.findOne({
         where: {
-          project_id: projectId,
+          project_id: null,
           item_type_id: Number(itemData.item_type_id),
         },
         transaction,
@@ -251,7 +251,7 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
       } else {
         await ProjectInventory.create(
           {
-            project_id: projectId,
+            project_id: null,
             item_type_id: Number(itemData.item_type_id),
             shelf_id: shelfId,
             rack_id: rackId,
@@ -271,7 +271,7 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
         );
       }
 
-      // 4. Record Stock Movement
+      // 4. Record Stock Movement into Central Warehouse (project_id = null)
       let locationNote = '';
       if (shelfId) {
         const shelf = await StorageShelf.findByPk(shelfId, { transaction });
@@ -284,14 +284,14 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
 
       await StockMovement.create(
         {
-          project_id: projectId,
+          project_id: null,
           item_type_id: Number(itemData.item_type_id),
           user_id: userId,
           type: 'IN',
           quantity: receivedQtyNow,
           previous_quantity: prevQty,
           new_quantity: newQty,
-          notes: `GRN: ${grn_number} (PO: ${po.po_number})${challan_no ? ` | Inv: ${challan_no}` : ''}${locationNote}`,
+          notes: `Central Inward via GRN: ${grn_number} (PO: ${po.po_number})${po.project_id ? ` | Purpose: Project #${po.project_id}` : ''}${challan_no ? ` | Inv: ${challan_no}` : ''}${locationNote}`,
         },
         { transaction }
       );

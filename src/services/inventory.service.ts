@@ -373,22 +373,21 @@ export class InventoryService {
   public static async syncAllStockFromReceived() {
     const { GoodsReceiptNoteItem, GoodsReceiptNote, PurchaseOrder, PurchaseOrderItem } = require('../models');
 
-    // 1. Process all received GRN items
+    // 1. Process all received GRN items (All stock enters Central Warehouse project_id = null)
     const grnItems = await GoodsReceiptNoteItem.findAll({
       include: [{ model: GoodsReceiptNote, as: 'grn' }],
     });
 
     for (const item of grnItems) {
-      const targetProjId = item.grn?.project_id ? Number(item.grn.project_id) : null;
       const itemTypeId = Number(item.item_type_id);
       const qty = Number(item.received_qty || 0);
 
       if (qty <= 0 || !itemTypeId) continue;
 
       const [projInv] = await ProjectInventory.findOrCreate({
-        where: { project_id: targetProjId, item_type_id: itemTypeId },
+        where: { project_id: null, item_type_id: itemTypeId },
         defaults: {
-          project_id: targetProjId,
+          project_id: null,
           item_type_id: itemTypeId,
           quantity: 0,
           min_quantity: 10,
@@ -407,7 +406,6 @@ export class InventoryService {
     });
 
     for (const po of receivedPOs) {
-      const targetProjId = (po.project_id && po.project_id !== 0) ? Number(po.project_id) : null;
       for (const item of po.items || []) {
         const itemTypeId = Number(item.item_type_id);
         const qty = Number(item.received_qty || item.ordered_qty || 0);
@@ -415,9 +413,9 @@ export class InventoryService {
         if (qty <= 0 || !itemTypeId) continue;
 
         const [projInv] = await ProjectInventory.findOrCreate({
-          where: { project_id: targetProjId, item_type_id: itemTypeId },
+          where: { project_id: null, item_type_id: itemTypeId },
           defaults: {
-            project_id: targetProjId,
+            project_id: null,
             item_type_id: itemTypeId,
             quantity: 0,
             min_quantity: 10,
