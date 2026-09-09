@@ -74,4 +74,19 @@ export class ReportController {
       res.status(500).json({ success: false, message: error.message || 'Failed to generate audit ledger report' });
     }
   }
+
+  public static async getProcurementDistribution(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { project_id, search, health } = req.query;
+      const data = await ReportService.getProcurementDistributionReport({
+        project_id: project_id ? parseInt(String(project_id), 10) : undefined,
+        search: search ? String(search) : undefined,
+        health: health ? String(health) as any : undefined,
+      });
+      res.json({ success: true, report: data });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message || 'Failed to generate procurement distribution report' });
+    }
+  }
 }
+

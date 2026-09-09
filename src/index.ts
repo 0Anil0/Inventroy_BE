@@ -122,8 +122,9 @@ const startServer = async () => {
         await VendorService.seedDefaultVendors();
         await ItemDescriptionService.seedDefaultItemDescriptions();
         await TermsAndConditionsService.seedDefaultTerms();
-        await POService.seedDefaultPO();
+        // await POService.seedDefaultPO();
       } catch (seedErr) {
+
         console.warn('Seeding warning:', seedErr);
       }
     } else {

@@ -453,34 +453,36 @@ export class InventoryService {
       ItemType,
       PurchaseOrderItem,
       PurchaseOrder,
+      MaterialIssueItem,
+      MaterialIssue,
     } = require('../models');
 
-    // 1. Truncate / Delete Project Assignment Items & Project Assignments
+    // 1. Delete Project Assignment Items & Project Assignments
     await ProjectAssignmentItem.destroy({ where: {}, force: true });
     await ProjectAssignment.destroy({ where: {}, force: true });
 
-    // 2. Truncate / Delete Goods Receipt Note Items & Goods Receipt Notes
+    // 2. Delete Goods Receipt Note Items & Goods Receipt Notes
     await GoodsReceiptNoteItem.destroy({ where: {}, force: true });
     await GoodsReceiptNote.destroy({ where: {}, force: true });
 
-    // 3. Truncate / Delete Stock Movements
+    // 3. Delete Material Issue Items & Material Issues
+    if (MaterialIssueItem) await MaterialIssueItem.destroy({ where: {}, force: true });
+    if (MaterialIssue) await MaterialIssue.destroy({ where: {}, force: true });
+
+    // 4. Delete Purchase Order Items & Purchase Orders
+    await PurchaseOrderItem.destroy({ where: {}, force: true });
+    await PurchaseOrder.destroy({ where: {}, force: true });
+
+    // 5. Delete Stock Movements
     await StockMovement.destroy({ where: {}, force: true });
 
-    // 4. Truncate / Delete Project Inventories
+    // 6. Delete Project Inventories
     await ProjectInventory.destroy({ where: {}, force: true });
 
-    // 5. Reset ItemType total_quantity to 0
+    // 7. Reset ItemType total_quantity to 0
     await ItemType.update({ total_quantity: 0 }, { where: {} });
 
-    // 6. Reset PO items received_qty to 0
-    await PurchaseOrderItem.update({ received_qty: 0 }, { where: {} });
-
-    // 7. Reset PO status to APPROVED if it was RECEIVED or PARTIALLY_RECEIVED
-    await PurchaseOrder.update(
-      { status: 'APPROVED' },
-      { where: {} }
-    );
-
-    return { success: true, message: 'All transactional stock, GRN, assignment, and inventory data reset successfully.' };
+    return { success: true, message: 'All transactional inventory, PO, GRN, assignment, and report data reset to scratch successfully.' };
   }
 }
+
