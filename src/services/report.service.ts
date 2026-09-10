@@ -29,7 +29,7 @@ export class ReportService {
       where,
       include: [
         { model: Project, as: 'project', attributes: ['id', 'name', 'code', 'location'] },
-        { model: ItemType, as: 'item_type', attributes: ['id', 'name', 'code', 'unit', 'total_quantity', 'description'] },
+        { model: ItemType, as: 'item_type' },
       ],
       order: [['project_id', 'ASC'], ['id', 'ASC']],
     });
@@ -186,18 +186,7 @@ export class ReportService {
     search?: string;
     health?: 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
   }) {
-    const itemWhere: any = {};
-    if (filters?.search) {
-      itemWhere[Op.or] = [
-        { name: { [Op.iLike]: `%${filters.search}%` } },
-        { code: { [Op.iLike]: `%${filters.search}%` } },
-        { cat_no: { [Op.iLike]: `%${filters.search}%` } },
-        { make: { [Op.iLike]: `%${filters.search}%` } },
-      ];
-    }
-
     const itemTypes = await ItemType.findAll({
-      where: itemWhere,
       order: [['id', 'ASC']],
     });
 
@@ -328,6 +317,27 @@ export class ReportService {
 
     if (filters?.health && filters.health !== 'ALL') {
       filteredReports = filteredReports.filter((r) => r.health_status === filters.health);
+    }
+
+    if (filters?.search) {
+      const q = filters.search.toLowerCase().trim();
+      filteredReports = filteredReports.filter((r) => {
+        const name = (r.name || '').toLowerCase();
+        const code = (r.code || '').toLowerCase();
+        const catNo = (r.cat_no || '').toLowerCase();
+        const make = (r.make || '').toLowerCase();
+        const rating = (r.rating || '').toLowerCase();
+        const hasProject = r.project_po_breakdown?.some(
+          (b) =>
+            b.project_name?.toLowerCase().includes(q) ||
+            b.project_code?.toLowerCase().includes(q) ||
+            b.po_numbers?.some((po) => po.toLowerCase().includes(q))
+        );
+        const hasSite = r.dispatched_site_breakdown?.some(
+          (b) => b.project_name?.toLowerCase().includes(q) || b.project_code?.toLowerCase().includes(q)
+        );
+        return name.includes(q) || code.includes(q) || catNo.includes(q) || make.includes(q) || rating.includes(q) || hasProject || hasSite;
+      });
     }
 
     const summary = {

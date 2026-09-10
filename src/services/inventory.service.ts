@@ -35,7 +35,6 @@ export class InventoryService {
         {
           model: ItemType,
           as: 'item_type',
-          attributes: ['id', 'name', 'code', 'unit', 'total_quantity', 'description'],
         },
         {
           model: StorageShelf,
@@ -129,7 +128,6 @@ export class InventoryService {
         {
           model: ItemType,
           as: 'item_type',
-          attributes: ['id', 'name', 'code', 'unit', 'total_quantity', 'description'],
         },
         {
           model: StorageShelf,
