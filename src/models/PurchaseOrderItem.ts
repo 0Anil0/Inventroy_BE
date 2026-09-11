@@ -9,6 +9,7 @@ export interface PurchaseOrderItemAttributes {
   cat_no?: string | null;
   make?: string | null;
   rating?: string | null;
+  hsn_code?: string | null;
   ordered_qty: number;
   received_qty?: number;
   unit_price?: number;
@@ -36,6 +37,7 @@ export class PurchaseOrderItem
   declare public cat_no: string | null;
   declare public make: string | null;
   declare public rating: string | null;
+  declare public hsn_code: string | null;
   declare public ordered_qty: number;
   declare public received_qty: number;
   declare public unit_price: number;
@@ -83,6 +85,10 @@ PurchaseOrderItem.init(
     },
     rating: {
       type: DataTypes.STRING(100),
+      allowNull: true,
+    },
+    hsn_code: {
+      type: DataTypes.STRING(50),
       allowNull: true,
     },
     ordered_qty: {

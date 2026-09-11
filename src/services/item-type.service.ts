@@ -120,6 +120,7 @@ export class ItemTypeService {
     name: string;
     code: string;
     cat_no?: string;
+    hsn_code?: string;
     make?: string;
     rating?: string;
     switchgear_family?: string;
@@ -152,6 +153,7 @@ export class ItemTypeService {
       name: data.name,
       code: data.code,
       cat_no: data.cat_no || null,
+      hsn_code: data.hsn_code || null,
       make: makeStr || null,
       rating: ratingStr || null,
       switchgear_family: data.switchgear_family || null,
@@ -175,6 +177,7 @@ export class ItemTypeService {
       name?: string;
       code?: string;
       cat_no?: string;
+      hsn_code?: string;
       make?: string;
       rating?: string;
       switchgear_family?: string;
@@ -220,6 +223,7 @@ export class ItemTypeService {
     code: string;
     name: string;
     cat_no?: string;
+    hsn_code?: string;
     make?: string;
     rating?: string;
     unit?: string;
@@ -253,6 +257,7 @@ export class ItemTypeService {
         await existing.update({
           name: nameStr,
           cat_no: itemData.cat_no ? String(itemData.cat_no).trim() : existing.cat_no,
+          hsn_code: itemData.hsn_code ? String(itemData.hsn_code).trim() : existing.hsn_code,
           make: makeStr || existing.make,
           rating: ratingStr || existing.rating,
           unit: finalUnitStr || existing.unit,
@@ -266,6 +271,7 @@ export class ItemTypeService {
           code: codeStr,
           name: nameStr,
           cat_no: itemData.cat_no ? String(itemData.cat_no).trim() : null,
+          hsn_code: itemData.hsn_code ? String(itemData.hsn_code).trim() : null,
           make: makeStr || null,
           rating: ratingStr || null,
           unit: finalUnitStr,

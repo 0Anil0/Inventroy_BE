@@ -79,6 +79,7 @@ export class POService {
         cat_no?: string;
         make?: string;
         rating?: string;
+        hsn_code?: string;
         ordered_qty: number;
         unit_price: number;
         discount_percent?: number;
@@ -109,6 +110,7 @@ export class POService {
         cat_no: i.cat_no || null,
         make: i.make || null,
         rating: i.rating || null,
+        hsn_code: i.hsn_code || null,
         ordered_qty: i.ordered_qty,
         received_qty: 0,
         unit_price: i.unit_price,
@@ -140,18 +142,24 @@ export class POService {
         ...itemData,
       });
 
-      // Auto-sync ItemType catalog unit_rate if currently 0
-      if (itemData.unit_price && itemData.unit_price > 0) {
-        const itemTypeObj = await ItemType.findByPk(itemData.item_type_id);
-        if (itemTypeObj && (!itemTypeObj.unit_rate || itemTypeObj.unit_rate === 0)) {
-          await itemTypeObj.update({ unit_rate: itemData.unit_price });
+      // Always sync PO unit_price to ItemType catalog Base Price (unit_rate)
+      const itemTypeObj = await ItemType.findByPk(itemData.item_type_id);
+      if (itemTypeObj) {
+        const updateFields: any = {};
+        if (itemData.unit_price !== undefined && itemData.unit_price > 0) {
+          updateFields.unit_rate = itemData.unit_price;
+        }
+        if (itemData.hsn_code && !itemTypeObj.hsn_code) {
+          updateFields.hsn_code = itemData.hsn_code;
+        }
+        if (Object.keys(updateFields).length > 0) {
+          await itemTypeObj.update(updateFields);
         }
       }
     }
 
     return await this.getById(po.id);
   }
-
 
   public static async update(
     id: number,
@@ -168,6 +176,7 @@ export class POService {
         cat_no?: string;
         make?: string;
         rating?: string;
+        hsn_code?: string;
         ordered_qty: number;
         unit_price: number;
         discount_percent?: number;
@@ -211,6 +220,7 @@ export class POService {
           cat_no: i.cat_no || null,
           make: i.make || null,
           rating: i.rating || null,
+          hsn_code: i.hsn_code || null,
           ordered_qty: i.ordered_qty,
           received_qty: 0,
           unit_price: i.unit_price,
@@ -229,6 +239,21 @@ export class POService {
           po_id: id,
           ...itemData,
         });
+
+        // Always sync PO unit_price to ItemType catalog Base Price (unit_rate)
+        const itemTypeObj = await ItemType.findByPk(itemData.item_type_id);
+        if (itemTypeObj) {
+          const updateFields: any = {};
+          if (itemData.unit_price !== undefined && itemData.unit_price > 0) {
+            updateFields.unit_rate = itemData.unit_price;
+          }
+          if (itemData.hsn_code && !itemTypeObj.hsn_code) {
+            updateFields.hsn_code = itemData.hsn_code;
+          }
+          if (Object.keys(updateFields).length > 0) {
+            await itemTypeObj.update(updateFields);
+          }
+        }
       }
     }
 
