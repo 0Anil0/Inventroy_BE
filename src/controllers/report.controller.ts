@@ -88,5 +88,19 @@ export class ReportController {
       res.status(500).json({ success: false, message: error.message || 'Failed to generate procurement distribution report' });
     }
   }
+
+  public static async getProjectFinancialCosting(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { project_id, search } = req.query;
+      const data = await ReportService.getProjectFinancialCostingReport({
+        project_id: project_id ? parseInt(String(project_id), 10) : undefined,
+        search: search ? String(search) : undefined,
+      });
+      res.json({ success: true, report: data });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message || 'Failed to generate project financial costing report' });
+    }
+  }
 }
+
 

@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { ItemType, Unit } from '../models';
+import { ItemType, Unit, Make, ItemDescription } from '../models';
 
 export interface ItemTypeQueryParams {
   page?: number;
@@ -13,6 +13,53 @@ export interface ItemTypeQueryParams {
 }
 
 export class ItemTypeService {
+  /**
+   * Helper to verify if Unit, Make, and ItemDescription (Rating) exist in master tables.
+   * If not present, auto-creates them so they are saved in database master tables.
+   */
+  private static async ensureMastersExist(data: { unit?: string; make?: string; rating?: string }) {
+    let unitObj: Unit | null = null;
+    let unitStr = data.unit && data.unit.trim() ? data.unit.trim().toUpperCase() : undefined;
+    let makeStr = data.make && data.make.trim() ? data.make.trim() : undefined;
+    let ratingStr = data.rating && data.rating.trim() ? data.rating.trim() : undefined;
+
+    if (unitStr) {
+      // Case-insensitive check to prevent duplicates like 'NOS' vs 'nos'
+      let existingUnit = await Unit.findOne({
+        where: { code: { [Op.iLike]: unitStr } },
+      });
+      if (!existingUnit) {
+        existingUnit = await Unit.create({ code: unitStr, name: unitStr });
+      }
+      unitObj = existingUnit;
+      unitStr = existingUnit.code;
+    }
+
+    if (makeStr) {
+      // Case-insensitive check to prevent duplicates like 'Havells' vs 'HAVELLS'
+      let existingMake = await Make.findOne({
+        where: { name: { [Op.iLike]: makeStr } },
+      });
+      if (!existingMake) {
+        existingMake = await Make.create({ name: makeStr });
+      }
+      makeStr = existingMake.name;
+    }
+
+    if (ratingStr) {
+      // Case-insensitive check to prevent duplicates like '6A C-Curve' vs '6a c-curve'
+      let existingDesc = await ItemDescription.findOne({
+        where: { name: { [Op.iLike]: ratingStr } },
+      });
+      if (!existingDesc) {
+        existingDesc = await ItemDescription.create({ name: ratingStr });
+      }
+      ratingStr = existingDesc.name;
+    }
+
+    return { unitObj, unitStr, makeStr, ratingStr };
+  }
+
   public static async getAll(params: ItemTypeQueryParams = {}) {
     const page = params.page && Number(params.page) > 0 ? Number(params.page) : 1;
     const limit = params.limit && Number(params.limit) > 0 ? Number(params.limit) : 1000;
@@ -69,7 +116,6 @@ export class ItemTypeService {
     };
   }
 
-
   public static async create(data: {
     name: string;
     code: string;
@@ -83,6 +129,7 @@ export class ItemTypeService {
     total_quantity?: number;
     description?: string;
     unit_rate?: number;
+    base_price?: number;
     discount?: number;
   }) {
     const existingCode = await ItemType.findOne({ where: { code: data.code } });
@@ -90,27 +137,30 @@ export class ItemTypeService {
       throw new Error('Item type code already exists');
     }
 
-    let unitStr = data.unit || 'pcs';
-    if (data.unit_id) {
-      const u = await Unit.findByPk(data.unit_id);
-      if (u) {
-        unitStr = u.code;
-      }
-    }
+    // Check & auto-create unit, make, and rating in master tables if not preset
+    const { unitObj, unitStr, makeStr, ratingStr } = await this.ensureMastersExist({
+      unit: data.unit,
+      make: data.make,
+      rating: data.rating,
+    });
+
+    const finalUnitStr = unitStr || (data.unit_id ? (await Unit.findByPk(data.unit_id))?.code : 'PCS') || 'PCS';
+    const finalUnitId = data.unit_id || unitObj?.id || null;
+    const rate = data.base_price !== undefined ? data.base_price : (data.unit_rate || 0);
 
     const created = await ItemType.create({
       name: data.name,
       code: data.code,
       cat_no: data.cat_no || null,
-      make: data.make || null,
-      rating: data.rating || null,
+      make: makeStr || null,
+      rating: ratingStr || null,
       switchgear_family: data.switchgear_family || null,
       full_description: data.full_description || null,
-      unit: unitStr,
-      unit_id: data.unit_id || null,
+      unit: finalUnitStr,
+      unit_id: finalUnitId,
       total_quantity: data.total_quantity !== undefined ? data.total_quantity : 0,
       description: data.description || null,
-      unit_rate: data.unit_rate || 0,
+      unit_rate: rate,
       discount: data.discount || 0,
     });
 
@@ -134,24 +184,107 @@ export class ItemTypeService {
       total_quantity?: number;
       description?: string;
       unit_rate?: number;
+      base_price?: number;
       discount?: number;
     }
   ) {
     const item = await ItemType.findByPk(id);
     if (!item) throw new Error('Item type not found');
 
+    // Check & auto-create unit, make, and rating in master tables if not preset
+    const { unitObj, unitStr, makeStr, ratingStr } = await this.ensureMastersExist({
+      unit: data.unit,
+      make: data.make,
+      rating: data.rating,
+    });
+
     const updatePayload: any = { ...data };
-    if (data.unit_id) {
-      const u = await Unit.findByPk(data.unit_id);
-      if (u) {
-        updatePayload.unit = u.code;
-      }
+    if (makeStr) updatePayload.make = makeStr;
+    if (ratingStr) updatePayload.rating = ratingStr;
+    if (unitStr) {
+      updatePayload.unit = unitStr;
+      if (unitObj) updatePayload.unit_id = unitObj.id;
+    }
+
+    if (data.base_price !== undefined) {
+      updatePayload.unit_rate = data.base_price;
     }
 
     await item.update(updatePayload);
     return await ItemType.findByPk(id, {
       include: [{ model: Unit, as: 'unit_details', required: false }],
     });
+  }
+
+  public static async bulkImport(items: Array<{
+    code: string;
+    name: string;
+    cat_no?: string;
+    make?: string;
+    rating?: string;
+    unit?: string;
+    base_price?: number;
+    unit_rate?: number;
+    description?: string;
+  }>) {
+    let createdCount = 0;
+    let updatedCount = 0;
+
+    for (const itemData of items) {
+      if (!itemData.code || !itemData.name) continue;
+
+      const codeStr = String(itemData.code).trim();
+      const nameStr = String(itemData.name).trim();
+      const rateVal = itemData.base_price !== undefined
+        ? Number(itemData.base_price)
+        : (itemData.unit_rate !== undefined ? Number(itemData.unit_rate) : 0);
+
+      // Check & auto-create unit, make, and rating in master tables if not preset
+      const { unitObj, unitStr, makeStr, ratingStr } = await this.ensureMastersExist({
+        unit: itemData.unit,
+        make: itemData.make,
+        rating: itemData.rating,
+      });
+
+      const finalUnitStr = unitStr || 'PCS';
+      const existing = await ItemType.findOne({ where: { code: codeStr } });
+
+      if (existing) {
+        await existing.update({
+          name: nameStr,
+          cat_no: itemData.cat_no ? String(itemData.cat_no).trim() : existing.cat_no,
+          make: makeStr || existing.make,
+          rating: ratingStr || existing.rating,
+          unit: finalUnitStr || existing.unit,
+          unit_id: unitObj ? unitObj.id : existing.unit_id,
+          unit_rate: rateVal > 0 ? rateVal : existing.unit_rate,
+          description: itemData.description ? String(itemData.description).trim() : existing.description,
+        });
+        updatedCount++;
+      } else {
+        await ItemType.create({
+          code: codeStr,
+          name: nameStr,
+          cat_no: itemData.cat_no ? String(itemData.cat_no).trim() : null,
+          make: makeStr || null,
+          rating: ratingStr || null,
+          unit: finalUnitStr,
+          unit_id: unitObj ? unitObj.id : null,
+          unit_rate: rateVal,
+          total_quantity: 0,
+          description: itemData.description ? String(itemData.description).trim() : null,
+        });
+        createdCount++;
+      }
+    }
+
+    return {
+      success: true,
+      createdCount,
+      updatedCount,
+      totalProcessed: items.length,
+      message: `Bulk import completed: ${createdCount} items created, ${updatedCount} items updated. All new Units, Makes, and Descriptions saved to Master tables.`,
+    };
   }
 
   public static async delete(id: number) {

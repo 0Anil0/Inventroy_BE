@@ -139,10 +139,19 @@ export class POService {
         po_id: po.id,
         ...itemData,
       });
+
+      // Auto-sync ItemType catalog unit_rate if currently 0
+      if (itemData.unit_price && itemData.unit_price > 0) {
+        const itemTypeObj = await ItemType.findByPk(itemData.item_type_id);
+        if (itemTypeObj && (!itemTypeObj.unit_rate || itemTypeObj.unit_rate === 0)) {
+          await itemTypeObj.update({ unit_rate: itemData.unit_price });
+        }
+      }
     }
 
     return await this.getById(po.id);
   }
+
 
   public static async update(
     id: number,

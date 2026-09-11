@@ -353,5 +353,214 @@ export class ReportService {
       items: filteredReports,
     };
   }
+
+  /**
+   * Report 8: Project Financial Costing & Investment Report (How much money put into project)
+   */
+  public static async getProjectFinancialCostingReport(filters?: {
+
+    project_id?: number;
+    search?: string;
+  }) {
+    const { Project, ProjectAssignment, ProjectAssignmentItem, ItemType, PurchaseOrderItem } = require('../models');
+
+    let targetProjectIds: number[] = [];
+    let mainProjects: any[] = [];
+
+    if (filters?.project_id) {
+      const pId = Number(filters.project_id);
+      const subProjects = await Project.findAll({ where: { parent_id: pId } });
+      targetProjectIds = [pId, ...subProjects.map((sp: any) => sp.id)];
+      const mainPrj = await Project.findByPk(pId);
+      if (mainPrj) mainProjects.push(mainPrj);
+    } else {
+      mainProjects = await Project.findAll({
+        where: { parent_id: null },
+      });
+      const allProjects = await Project.findAll();
+      targetProjectIds = allProjects.map((p: any) => p.id);
+    }
+
+    // Lookup latest Purchase Order unit price, discount %, and GST % for each item_type_id
+    const latestPoItemMap: Record<number, { base_unit_price: number; disc_percent: number; gst_percent: number; effective_unit_cost: number }> = {};
+    try {
+      const poItems = await PurchaseOrderItem.findAll({ order: [['id', 'DESC']] });
+      poItems.forEach((poi: any) => {
+        if (!latestPoItemMap[poi.item_type_id]) {
+          const basePrice = Number(poi.unit_price) || 0;
+          const disc = Number(poi.discount_percent) || 0;
+          const gst = poi.gst_percent !== undefined ? Number(poi.gst_percent) : 18;
+
+          const priceAfterDisc = basePrice - (basePrice * (disc / 100));
+          const effectiveUnitCost = Number((priceAfterDisc * (1 + gst / 100)).toFixed(2));
+
+          if (basePrice > 0 || effectiveUnitCost > 0) {
+            latestPoItemMap[poi.item_type_id] = {
+              base_unit_price: basePrice,
+              disc_percent: disc,
+              gst_percent: gst,
+              effective_unit_cost: effectiveUnitCost,
+            };
+          }
+        }
+      });
+    } catch (err) {
+      console.error('Error loading PO unit prices for costing fallback:', err);
+    }
+
+    const whereAssignment: any = {};
+    if (targetProjectIds.length > 0) {
+      whereAssignment.to_project_id = { [Op.in]: targetProjectIds };
+    }
+
+    const assignments = await ProjectAssignment.findAll({
+      where: whereAssignment,
+      include: [
+        {
+          model: ProjectAssignmentItem,
+          as: 'items',
+          include: [{ model: ItemType, as: 'item_type' }],
+        },
+        { model: Project, as: 'to_project', attributes: ['id', 'name', 'code', 'parent_id', 'location'] },
+      ],
+      order: [['id', 'DESC']],
+    });
+
+    let totalMoneyInvested = 0;
+    let totalQuantityAssigned = 0;
+
+    const categoryMap: Record<string, { category: string; items_count: number; total_qty: number; total_cost: number }> = {};
+    const subProjectCostMap: Record<number, { id: number; name: string; code: string; location: string; items_count: number; total_qty: number; money_invested: number; percent_share: number }> = {};
+    let itemizedLedger: any[] = [];
+
+    assignments.forEach((assignment: any) => {
+      const siteId = assignment.to_project_id;
+      const siteName = assignment.to_project?.name || `Site #${siteId}`;
+      const siteCode = assignment.to_project?.code || '';
+
+      if (!subProjectCostMap[siteId]) {
+        subProjectCostMap[siteId] = {
+          id: siteId,
+          name: siteName,
+          code: siteCode,
+          location: assignment.to_project?.location || '',
+          items_count: 0,
+          total_qty: 0,
+          money_invested: 0,
+          percent_share: 0,
+        };
+      }
+
+      (assignment.items || []).forEach((item: any) => {
+        const qty = item.quantity || 0;
+
+        // Determine Effective Purchase Unit Cost (Incl GST)
+        let baseUnitPrice = 0;
+        let gstPercent = 18;
+        let discPercent = 0;
+        let unitCost = 0; // Net Landed Unit Cost (incl. GST)
+
+        if (latestPoItemMap[item.item_type_id]) {
+          const poInfo = latestPoItemMap[item.item_type_id];
+          baseUnitPrice = poInfo.base_unit_price;
+          gstPercent = poInfo.gst_percent;
+          discPercent = poInfo.disc_percent;
+          unitCost = poInfo.effective_unit_cost;
+        } else if (item.unit_cost !== undefined && item.unit_cost !== null && Number(item.unit_cost) > 0) {
+          baseUnitPrice = Number(item.unit_cost);
+          unitCost = Number((baseUnitPrice * 1.18).toFixed(2));
+        } else if (item.item_type?.unit_rate && Number(item.item_type.unit_rate) > 0) {
+          baseUnitPrice = Number(item.item_type.unit_rate);
+          unitCost = Number((baseUnitPrice * 1.18).toFixed(2));
+        }
+
+        const lineCost = Number((qty * unitCost).toFixed(2));
+        const category = item.item_type?.category || 'General Equipment';
+
+        totalMoneyInvested += lineCost;
+        totalQuantityAssigned += qty;
+
+        // Sub-Project Site Accumulation
+        subProjectCostMap[siteId].total_qty += qty;
+        subProjectCostMap[siteId].money_invested += lineCost;
+        subProjectCostMap[siteId].items_count += 1;
+
+        // Category Accumulation
+        if (!categoryMap[category]) {
+          categoryMap[category] = { category, items_count: 0, total_qty: 0, total_cost: 0 };
+        }
+        categoryMap[category].items_count += 1;
+        categoryMap[category].total_qty += qty;
+        categoryMap[category].total_cost += lineCost;
+
+        // Itemized Ledger Line
+        itemizedLedger.push({
+          id: item.id,
+          assignment_id: assignment.id,
+          assignment_no: assignment.assignment_no,
+          site_id: siteId,
+          site_name: siteName,
+          site_code: siteCode,
+          item_type_id: item.item_type_id,
+          code: item.item_type?.code || '',
+          name: item.item_type?.name || '',
+          cat_no: item.item_type?.cat_no || '',
+          make: item.item_type?.make || '',
+          unit: item.item_type?.unit || 'pcs',
+          category,
+          quantity: qty,
+          base_unit_price: baseUnitPrice,
+          disc_percent: discPercent,
+          gst_percent: gstPercent,
+          unit_cost: unitCost, // Effective Unit Cost incl GST
+          total_cost: lineCost,
+          status: item.status || 'Allocated',
+          assigned_at: item.createdAt,
+        });
+      });
+    });
+
+
+    // Calculate percent share for sub-projects and categories
+    const subProjectsCosting = Object.values(subProjectCostMap).map((sp) => ({
+      ...sp,
+      money_invested: Number(sp.money_invested.toFixed(2)),
+      percent_share: totalMoneyInvested > 0 ? Number(((sp.money_invested / totalMoneyInvested) * 100).toFixed(1)) : 0,
+    }));
+
+    const categoryCosting = Object.values(categoryMap).map((cat) => ({
+      ...cat,
+      total_cost: Number(cat.total_cost.toFixed(2)),
+      percent_share: totalMoneyInvested > 0 ? Number(((cat.total_cost / totalMoneyInvested) * 100).toFixed(1)) : 0,
+    }));
+
+    if (filters?.search) {
+      const q = filters.search.toLowerCase().trim();
+      itemizedLedger = itemizedLedger.filter(
+        (item) =>
+          item.name.toLowerCase().includes(q) ||
+          item.code.toLowerCase().includes(q) ||
+          item.cat_no.toLowerCase().includes(q) ||
+          item.make.toLowerCase().includes(q) ||
+          item.site_name.toLowerCase().includes(q)
+      );
+    }
+
+    return {
+      summary: {
+        total_projects: mainProjects.length,
+        total_money_invested: Number(totalMoneyInvested.toFixed(2)), // Actual Money put into project (incl. GST)
+        total_project_cost: Number(totalMoneyInvested.toFixed(2)),
+        total_quantity_assigned: totalQuantityAssigned,
+        total_item_types: new Set(itemizedLedger.map((i) => i.item_type_id)).size,
+        total_sub_projects: subProjectsCosting.length,
+      },
+      sub_projects_costing: subProjectsCosting,
+      category_costing: categoryCosting,
+      itemized_ledger: itemizedLedger,
+      selected_project: mainProjects.length === 1 ? mainProjects[0] : null,
+    };
+
+  }
 }
 

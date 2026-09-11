@@ -12,6 +12,8 @@ router.get('/reports/material-issues', ReportController.getMaterialIssues);
 router.get('/reports/stock-transfers', ReportController.getStockTransfers);
 router.get('/reports/audit-ledger', ReportController.getAuditLedger);
 router.get('/reports/procurement-distribution', ReportController.getProcurementDistribution);
+router.get('/reports/project-costing', ReportController.getProjectFinancialCosting);
 
 export default router;
+
 

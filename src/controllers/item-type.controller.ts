@@ -24,7 +24,7 @@ export class ItemTypeController {
 
   public static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { name, code, cat_no, make, rating, switchgear_family, full_description, unit, unit_id, total_quantity, description, unit_rate, discount } = req.body;
+      const { name, code, cat_no, make, rating, switchgear_family, full_description, unit, unit_id, total_quantity, description, unit_rate, base_price, discount } = req.body;
       if (!name || !code) {
         res.status(400).json({ success: false, message: 'Name and Code are required' });
         return;
@@ -42,6 +42,7 @@ export class ItemTypeController {
         total_quantity: total_quantity !== undefined ? parseFloat(String(total_quantity)) : 0,
         description,
         unit_rate: unit_rate !== undefined ? parseFloat(String(unit_rate)) : 0,
+        base_price: base_price !== undefined ? parseFloat(String(base_price)) : undefined,
         discount: discount !== undefined ? parseFloat(String(discount)) : 0,
       });
       res.status(201).json({ success: true, item });
@@ -60,6 +61,21 @@ export class ItemTypeController {
     }
   }
 
+  public static async bulkImport(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { items } = req.body;
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        res.status(400).json({ success: false, message: 'Items array is required for bulk import' });
+        return;
+      }
+
+      const result = await ItemTypeService.bulkImport(items);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message || 'Failed to bulk import item master records' });
+    }
+  }
+
   public static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = parseInt(String(req.params.id), 10);
@@ -70,3 +86,4 @@ export class ItemTypeController {
     }
   }
 }
+
