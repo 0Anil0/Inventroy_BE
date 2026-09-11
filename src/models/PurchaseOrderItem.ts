@@ -50,6 +50,7 @@ export class PurchaseOrderItem
   declare public readonly updatedAt: Date;
 
   declare public readonly item_type?: ItemType;
+  declare public readonly purchase_order?: any;
 }
 
 PurchaseOrderItem.init(

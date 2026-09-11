@@ -153,4 +153,20 @@ export class POController {
       res.status(400).json({ success: false, message: error.message });
     }
   }
+
+  public static async getItemTracking(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { item_type_id, vendor_id, project_id, status, search } = req.query;
+      const result = await POService.getItemTracking({
+        item_type_id: item_type_id ? parseInt(String(item_type_id), 10) : undefined,
+        vendor_id: vendor_id ? parseInt(String(vendor_id), 10) : undefined,
+        project_id: project_id ? parseInt(String(project_id), 10) : undefined,
+        status: status ? String(status) : undefined,
+        search: search ? String(search) : undefined,
+      });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
 }

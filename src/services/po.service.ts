@@ -437,4 +437,135 @@ export class POService {
     await po.destroy();
     return { success: true, message: 'Purchase Order deleted successfully' };
   }
+
+  public static async getItemTracking(params: {
+    item_type_id?: number;
+    vendor_id?: number;
+    project_id?: number;
+    status?: string;
+    search?: string;
+  }) {
+    const whereItem: any = {};
+    const wherePO: any = {};
+
+    if (params.item_type_id) {
+      whereItem.item_type_id = params.item_type_id;
+    }
+    if (params.vendor_id) {
+      wherePO.vendor_id = params.vendor_id;
+    }
+    if (params.project_id) {
+      wherePO.project_id = params.project_id;
+    }
+    if (params.status && params.status !== 'ALL') {
+      wherePO.status = params.status;
+    }
+
+    if (params.search) {
+      const q = `%${params.search.trim()}%`;
+      whereItem[Op.or] = [
+        { cat_no: { [Op.iLike]: q } },
+        { make: { [Op.iLike]: q } },
+        { rating: { [Op.iLike]: q } },
+        { hsn_code: { [Op.iLike]: q } },
+      ];
+    }
+
+    const items = await PurchaseOrderItem.findAll({
+      where: whereItem,
+      include: [
+        {
+          model: ItemType,
+          as: 'item_type',
+          where: params.search
+            ? {
+                [Op.or]: [
+                  { name: { [Op.iLike]: `%${params.search.trim()}%` } },
+                  { code: { [Op.iLike]: `%${params.search.trim()}%` } },
+                  { cat_no: { [Op.iLike]: `%${params.search.trim()}%` } },
+                  { make: { [Op.iLike]: `%${params.search.trim()}%` } },
+                ],
+              }
+            : undefined,
+          required: false,
+        },
+        {
+          model: PurchaseOrder,
+          as: 'purchase_order',
+          where: wherePO,
+          include: [
+            { model: Vendor, as: 'vendor' },
+            { model: Project, as: 'project' },
+            { model: User, as: 'created_by_user', attributes: ['id', 'username', 'email'] },
+          ],
+        },
+      ],
+      order: [['id', 'DESC']],
+    });
+
+    let totalOrderedQty = 0;
+    let totalReceivedQty = 0;
+    let totalSpend = 0;
+
+    const formattedList = items.map((row) => {
+      const ordQty = Number(row.ordered_qty || 0);
+      const recQty = Number(row.received_qty || 0);
+      const price = Number(row.unit_price || 0);
+      const disc = Number(row.discount_percent || 0);
+      const gst = Number(row.gst_percent !== undefined ? row.gst_percent : 18);
+
+      const netSub = ordQty * price * (1 - disc / 100);
+      const lineTax = netSub * (gst / 100);
+      const grandLine = netSub + lineTax;
+
+      totalOrderedQty += ordQty;
+      totalReceivedQty += recQty;
+      totalSpend += grandLine;
+
+      return {
+        id: row.id,
+        po_id: row.po_id,
+        po_number: row.purchase_order?.po_number || `PO-#${row.po_id}`,
+        order_date: row.purchase_order?.order_date,
+        expected_date: row.purchase_order?.expected_date,
+        po_status: row.purchase_order?.status || 'PENDING',
+        vendor_id: row.purchase_order?.vendor_id,
+        vendor_name: row.purchase_order?.vendor?.name || 'N/A',
+        project_id: row.purchase_order?.project_id,
+        project_name: row.purchase_order?.project ? `${row.purchase_order.project.code} - ${row.purchase_order.project.name}` : 'General / Central',
+        created_by: row.purchase_order?.created_by_user?.username || 'System',
+
+        item_type_id: row.item_type_id,
+        item_code: row.item_type?.code || 'N/A',
+        item_name: row.item_type?.name || 'N/A',
+        cat_no: row.cat_no || row.item_type?.cat_no || '-',
+        make: row.make || row.item_type?.make || '-',
+        rating: row.rating || row.item_type?.rating || '-',
+        unit: row.item_type?.unit || 'PCS',
+        hsn_code: row.hsn_code || row.item_type?.hsn_code || '-',
+
+        ordered_qty: ordQty,
+        received_qty: recQty,
+        pending_qty: Math.max(0, ordQty - recQty),
+        unit_price: price,
+        discount_percent: disc,
+        gst_percent: gst,
+        tax_amount: lineTax,
+        net_subtotal: netSub,
+        total_price: grandLine,
+      };
+    });
+
+    return {
+      success: true,
+      summary: {
+        totalRecords: items.length,
+        totalOrderedQty,
+        totalReceivedQty,
+        totalPendingQty: Math.max(0, totalOrderedQty - totalReceivedQty),
+        totalSpend,
+      },
+      items: formattedList,
+    };
+  }
 }

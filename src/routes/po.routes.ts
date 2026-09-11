@@ -7,6 +7,7 @@ const router = Router();
 router.use(authenticateToken);
 
 router.get('/purchase-orders', POController.getAll);
+router.get('/purchase-orders/item-tracking', POController.getItemTracking);
 router.get('/purchase-orders/:id', POController.getById);
 router.post('/purchase-orders', POController.create);
 router.put('/purchase-orders/:id', POController.update);
