@@ -96,6 +96,7 @@ export class POService {
     const itemsPayload = [];
 
     for (const i of data.items) {
+      const itemTypeObj = await ItemType.findByPk(i.item_type_id);
       const disc = i.discount_percent || 0;
       const gst = i.gst_percent !== undefined ? i.gst_percent : 18;
       const gross = i.ordered_qty * i.unit_price;
@@ -107,10 +108,10 @@ export class POService {
 
       itemsPayload.push({
         item_type_id: i.item_type_id,
-        cat_no: i.cat_no || null,
-        make: i.make || null,
-        rating: i.rating || null,
-        hsn_code: i.hsn_code || null,
+        cat_no: i.cat_no || itemTypeObj?.cat_no || null,
+        make: i.make || itemTypeObj?.make || null,
+        rating: i.rating || itemTypeObj?.rating || null,
+        hsn_code: i.hsn_code || itemTypeObj?.hsn_code || null,
         ordered_qty: i.ordered_qty,
         received_qty: 0,
         unit_price: i.unit_price,
@@ -206,6 +207,7 @@ export class POService {
       const itemsPayload = [];
 
       for (const i of data.items) {
+        const itemTypeObj = await ItemType.findByPk(i.item_type_id);
         const disc = i.discount_percent || 0;
         const gst = i.gst_percent !== undefined ? i.gst_percent : 18;
         const gross = i.ordered_qty * i.unit_price;
@@ -217,10 +219,10 @@ export class POService {
 
         itemsPayload.push({
           item_type_id: i.item_type_id,
-          cat_no: i.cat_no || null,
-          make: i.make || null,
-          rating: i.rating || null,
-          hsn_code: i.hsn_code || null,
+          cat_no: i.cat_no || itemTypeObj?.cat_no || null,
+          make: i.make || itemTypeObj?.make || null,
+          rating: i.rating || itemTypeObj?.rating || null,
+          hsn_code: i.hsn_code || itemTypeObj?.hsn_code || null,
           ordered_qty: i.ordered_qty,
           received_qty: 0,
           unit_price: i.unit_price,

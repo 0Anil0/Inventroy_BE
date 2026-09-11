@@ -106,6 +106,12 @@ export class InventoryService {
 
     await record.update(updateFields);
 
+    // Sync ItemType total_quantity across all ProjectInventory locations
+    const totalStock = await ProjectInventory.sum('quantity', {
+      where: { item_type_id },
+    });
+    await itemType.update({ total_quantity: totalStock || 0 });
+
     // Record Audit Movement Log
     if (diff !== 0 || adjustment_type) {
       const movementType: 'IN' | 'OUT' | 'SET' =
@@ -453,7 +459,13 @@ export class InventoryService {
       PurchaseOrder,
       MaterialIssueItem,
       MaterialIssue,
+      PurchaseRequisitionItem,
+      PurchaseRequisition,
     } = require('../models');
+
+    // 0. Delete Purchase Requisition Items & Requisitions
+    if (PurchaseRequisitionItem) await PurchaseRequisitionItem.destroy({ where: {}, force: true });
+    if (PurchaseRequisition) await PurchaseRequisition.destroy({ where: {}, force: true });
 
     // 1. Delete Project Assignment Items & Project Assignments
     await ProjectAssignmentItem.destroy({ where: {}, force: true });

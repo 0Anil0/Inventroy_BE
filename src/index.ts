@@ -9,6 +9,7 @@ import { VendorService } from './services/vendor.service';
 import { ItemDescriptionService } from './services/item-description.service';
 import { TermsAndConditionsService } from './services/terms-and-conditions.service';
 import { POService } from './services/po.service';
+import { PRService } from './services/pr.service';
 import { InventoryService } from './services/inventory.service';
 
 import authRoutes from './routes/auth.routes';
@@ -30,6 +31,7 @@ import storageLocationRoutes from './routes/storage-location.routes';
 import grnRoutes from './routes/grn.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import projectAssignmentRoutes from './routes/projectAssignment.routes';
+import prRoutes from './routes/pr.routes';
 import { errorHandler } from './middlewares/error.middleware';
 
 const app = express();
@@ -60,6 +62,7 @@ app.use('/api', stockMovementRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api', storageLocationRoutes);
 app.use('/api', inventoryRoutes);
+app.use('/api', prRoutes);
 app.use('/api/grn', grnRoutes);
 app.use('/api/project-assignments', projectAssignmentRoutes);
 
@@ -122,6 +125,7 @@ const startServer = async () => {
         await VendorService.seedDefaultVendors();
         await ItemDescriptionService.seedDefaultItemDescriptions();
         await TermsAndConditionsService.seedDefaultTerms();
+        // await PRService.seedDefaultPR();
         // await POService.seedDefaultPO();
       } catch (seedErr) {
 

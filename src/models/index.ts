@@ -21,6 +21,8 @@ import { GoodsReceiptNote } from './GoodsReceiptNote';
 import { GoodsReceiptNoteItem } from './GoodsReceiptNoteItem';
 import { ProjectAssignment } from './ProjectAssignment';
 import { ProjectAssignmentItem } from './ProjectAssignmentItem';
+import { PurchaseRequisition } from './PurchaseRequisition';
+import { PurchaseRequisitionItem } from './PurchaseRequisitionItem';
 
 // User & Role Associations
 User.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
@@ -41,6 +43,19 @@ ItemType.belongsTo(Make, { foreignKey: 'make_id', as: 'make_details' });
 // Unit & ItemType Associations
 Unit.hasMany(ItemType, { foreignKey: 'unit_id', as: 'item_types' });
 ItemType.belongsTo(Unit, { foreignKey: 'unit_id', as: 'unit_details' });
+
+// Purchase Requisition Associations
+PurchaseRequisition.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
+Project.hasMany(PurchaseRequisition, { foreignKey: 'project_id', as: 'purchase_requisitions' });
+
+PurchaseRequisition.belongsTo(User, { foreignKey: 'requested_by_id', as: 'requested_by_user' });
+PurchaseRequisition.belongsTo(User, { foreignKey: 'reviewed_by_id', as: 'reviewed_by_user' });
+
+PurchaseRequisition.hasMany(PurchaseRequisitionItem, { foreignKey: 'pr_id', as: 'items', onDelete: 'CASCADE' });
+PurchaseRequisitionItem.belongsTo(PurchaseRequisition, { foreignKey: 'pr_id', as: 'requisition' });
+
+PurchaseRequisitionItem.belongsTo(ItemType, { foreignKey: 'item_type_id', as: 'item_type' });
+ItemType.hasMany(PurchaseRequisitionItem, { foreignKey: 'item_type_id', as: 'pr_items' });
 
 // Purchase Order Associations
 PurchaseOrder.belongsTo(Vendor, { foreignKey: 'vendor_id', as: 'vendor' });
@@ -135,4 +150,6 @@ export {
   GoodsReceiptNoteItem,
   ProjectAssignment,
   ProjectAssignmentItem,
+  PurchaseRequisition,
+  PurchaseRequisitionItem,
 };
