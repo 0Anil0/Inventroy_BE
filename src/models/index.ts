@@ -49,7 +49,10 @@ PurchaseRequisition.belongsTo(Project, { foreignKey: 'project_id', as: 'project'
 Project.hasMany(PurchaseRequisition, { foreignKey: 'project_id', as: 'purchase_requisitions' });
 
 PurchaseRequisition.belongsTo(User, { foreignKey: 'requested_by_id', as: 'requested_by_user' });
+PurchaseRequisition.belongsTo(User, { foreignKey: 'created_by_id', as: 'created_by_user' });
 PurchaseRequisition.belongsTo(User, { foreignKey: 'reviewed_by_id', as: 'reviewed_by_user' });
+PurchaseRequisition.belongsTo(User, { foreignKey: 'approved_by_id', as: 'approved_by_user' });
+PurchaseRequisition.belongsTo(User, { foreignKey: 'rejected_by_id', as: 'rejected_by_user' });
 
 PurchaseRequisition.hasMany(PurchaseRequisitionItem, { foreignKey: 'pr_id', as: 'items', onDelete: 'CASCADE' });
 PurchaseRequisitionItem.belongsTo(PurchaseRequisition, { foreignKey: 'pr_id', as: 'requisition' });
@@ -73,6 +76,7 @@ TermsAndConditions.hasMany(PurchaseOrder, { foreignKey: 'terms_and_conditions_id
 
 PurchaseOrder.belongsTo(User, { foreignKey: 'created_by_id', as: 'created_by_user' });
 PurchaseOrder.belongsTo(User, { foreignKey: 'approved_by_id', as: 'approved_by_user' });
+PurchaseOrder.belongsTo(User, { foreignKey: 'rejected_by_id', as: 'rejected_by_user' });
 
 PurchaseOrder.hasMany(PurchaseOrderItem, { foreignKey: 'po_id', as: 'items' });
 PurchaseOrderItem.belongsTo(PurchaseOrder, { foreignKey: 'po_id', as: 'purchase_order' });

@@ -19,8 +19,13 @@ export interface PurchaseRequisitionAttributes {
   pr_number: string;
   project_id?: number | null;
   requested_by_id?: number | null;
+  created_by_id?: number | null;
   reviewed_by_id?: number | null;
+  approved_by_id?: number | null;
+  rejected_by_id?: number | null;
   approved_at?: Date | null;
+  rejected_at?: Date | null;
+  rejection_reason?: string | null;
   status: PRStatus;
   priority: PRPriority;
   required_date?: Date | null;
@@ -36,8 +41,13 @@ export interface PurchaseRequisitionCreationAttributes
     | 'id'
     | 'project_id'
     | 'requested_by_id'
+    | 'created_by_id'
     | 'reviewed_by_id'
+    | 'approved_by_id'
+    | 'rejected_by_id'
     | 'approved_at'
+    | 'rejected_at'
+    | 'rejection_reason'
     | 'status'
     | 'priority'
     | 'required_date'
@@ -52,8 +62,13 @@ export class PurchaseRequisition
   declare public pr_number: string;
   declare public project_id: number | null;
   declare public requested_by_id: number | null;
+  declare public created_by_id: number | null;
   declare public reviewed_by_id: number | null;
+  declare public approved_by_id: number | null;
+  declare public rejected_by_id: number | null;
   declare public approved_at: Date | null;
+  declare public rejected_at: Date | null;
+  declare public rejection_reason: string | null;
   declare public status: PRStatus;
   declare public priority: PRPriority;
   declare public required_date: Date | null;
@@ -64,7 +79,10 @@ export class PurchaseRequisition
 
   declare public readonly project?: Project;
   declare public readonly requested_by_user?: User;
+  declare public readonly created_by_user?: User;
   declare public readonly reviewed_by_user?: User;
+  declare public readonly approved_by_user?: User;
+  declare public readonly rejected_by_user?: User;
   declare public readonly items?: any[];
 }
 
@@ -96,7 +114,31 @@ PurchaseRequisition.init(
         key: 'id',
       },
     },
+    created_by_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id',
+      },
+    },
     reviewed_by_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id',
+      },
+    },
+    approved_by_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id',
+      },
+    },
+    rejected_by_id: {
       type: DataTypes.INTEGER,
       allowNull: true,
       references: {
@@ -106,6 +148,14 @@ PurchaseRequisition.init(
     },
     approved_at: {
       type: DataTypes.DATE,
+      allowNull: true,
+    },
+    rejected_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    rejection_reason: {
+      type: DataTypes.STRING(255),
       allowNull: true,
     },
     status: {

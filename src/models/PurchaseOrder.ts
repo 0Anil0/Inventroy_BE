@@ -16,6 +16,9 @@ export interface PurchaseOrderAttributes {
   created_by_id?: number | null;
   approved_by_id?: number | null;
   approved_at?: Date | null;
+  rejected_by_id?: number | null;
+  rejected_at?: Date | null;
+  rejection_reason?: string | null;
   status: POStatus;
   total_amount?: number;
   order_date?: Date;
@@ -34,6 +37,9 @@ export interface PurchaseOrderCreationAttributes
     | 'created_by_id'
     | 'approved_by_id'
     | 'approved_at'
+    | 'rejected_by_id'
+    | 'rejected_at'
+    | 'rejection_reason'
     | 'status'
     | 'total_amount'
     | 'order_date'
@@ -53,6 +59,9 @@ export class PurchaseOrder
   declare public created_by_id: number | null;
   declare public approved_by_id: number | null;
   declare public approved_at: Date | null;
+  declare public rejected_by_id: number | null;
+  declare public rejected_at: Date | null;
+  declare public rejection_reason: string | null;
   declare public status: POStatus;
   declare public total_amount: number;
   declare public order_date: Date;
@@ -68,6 +77,7 @@ export class PurchaseOrder
   declare public readonly items?: PurchaseOrderItem[];
   declare public readonly created_by_user?: User;
   declare public readonly approved_by_user?: User;
+  declare public readonly rejected_by_user?: User;
 }
 
 PurchaseOrder.init(
@@ -124,6 +134,22 @@ PurchaseOrder.init(
     },
     approved_at: {
       type: DataTypes.DATE,
+      allowNull: true,
+    },
+    rejected_by_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id',
+      },
+    },
+    rejected_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    rejection_reason: {
+      type: DataTypes.STRING(255),
       allowNull: true,
     },
     status: {

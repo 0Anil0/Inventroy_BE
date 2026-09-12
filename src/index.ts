@@ -107,6 +107,16 @@ const startServer = async () => {
         'ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "parent_id" INTEGER;',
         'ALTER TABLE "projects" DROP CONSTRAINT IF EXISTS "projects_parent_id_fkey";',
         'ALTER TABLE "projects" ADD CONSTRAINT "projects_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "projects"("id") ON DELETE CASCADE;',
+        'ALTER TABLE "purchase_requisitions" ADD COLUMN IF NOT EXISTS "created_by_id" INTEGER;',
+        'ALTER TABLE "purchase_requisitions" ADD COLUMN IF NOT EXISTS "approved_by_id" INTEGER;',
+        'ALTER TABLE "purchase_requisitions" ADD COLUMN IF NOT EXISTS "rejected_by_id" INTEGER;',
+        'ALTER TABLE "purchase_requisitions" ADD COLUMN IF NOT EXISTS "rejected_at" TIMESTAMP WITH TIME ZONE;',
+        'ALTER TABLE "purchase_requisitions" ADD COLUMN IF NOT EXISTS "rejection_reason" VARCHAR(255);',
+        'ALTER TABLE "purchase_orders" ADD COLUMN IF NOT EXISTS "created_by_id" INTEGER;',
+        'ALTER TABLE "purchase_orders" ADD COLUMN IF NOT EXISTS "approved_by_id" INTEGER;',
+        'ALTER TABLE "purchase_orders" ADD COLUMN IF NOT EXISTS "rejected_by_id" INTEGER;',
+        'ALTER TABLE "purchase_orders" ADD COLUMN IF NOT EXISTS "rejected_at" TIMESTAMP WITH TIME ZONE;',
+        'ALTER TABLE "purchase_orders" ADD COLUMN IF NOT EXISTS "rejection_reason" VARCHAR(255);',
       ];
 
       for (const q of alterQueries) {

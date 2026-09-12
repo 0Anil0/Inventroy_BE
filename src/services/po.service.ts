@@ -35,6 +35,7 @@ export class POService {
         { model: TermsAndConditions, as: 'terms_and_conditions' },
         { model: User, as: 'created_by_user', attributes: ['id', 'username', 'email'] },
         { model: User, as: 'approved_by_user', attributes: ['id', 'username', 'email'] },
+        { model: User, as: 'rejected_by_user', attributes: ['id', 'username', 'email'] },
         {
           model: PurchaseOrderItem,
           as: 'items',
@@ -53,6 +54,7 @@ export class POService {
         { model: TermsAndConditions, as: 'terms_and_conditions' },
         { model: User, as: 'created_by_user', attributes: ['id', 'username', 'email'] },
         { model: User, as: 'approved_by_user', attributes: ['id', 'username', 'email'] },
+        { model: User, as: 'rejected_by_user', attributes: ['id', 'username', 'email'] },
         {
           model: PurchaseOrderItem,
           as: 'items',
@@ -305,6 +307,8 @@ export class POService {
 
     await po.update({
       status: 'REJECTED',
+      rejected_by_id: userId,
+      rejected_at: new Date(),
     });
 
     return await this.getById(id);

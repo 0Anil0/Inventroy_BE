@@ -34,7 +34,10 @@ export class PRService {
       include: [
         { model: Project, as: 'project' },
         { model: User, as: 'requested_by_user', attributes: ['id', 'username', 'email'] },
+        { model: User, as: 'created_by_user', attributes: ['id', 'username', 'email'] },
         { model: User, as: 'reviewed_by_user', attributes: ['id', 'username', 'email'] },
+        { model: User, as: 'approved_by_user', attributes: ['id', 'username', 'email'] },
+        { model: User, as: 'rejected_by_user', attributes: ['id', 'username', 'email'] },
         {
           model: PurchaseRequisitionItem,
           as: 'items',
@@ -52,7 +55,10 @@ export class PRService {
       include: [
         { model: Project, as: 'project' },
         { model: User, as: 'requested_by_user', attributes: ['id', 'username', 'email'] },
+        { model: User, as: 'created_by_user', attributes: ['id', 'username', 'email'] },
         { model: User, as: 'reviewed_by_user', attributes: ['id', 'username', 'email'] },
+        { model: User, as: 'approved_by_user', attributes: ['id', 'username', 'email'] },
+        { model: User, as: 'rejected_by_user', attributes: ['id', 'username', 'email'] },
         {
           model: PurchaseRequisitionItem,
           as: 'items',
@@ -130,6 +136,7 @@ export class PRService {
       pr_number: prNumber,
       project_id: data.project_id || null,
       requested_by_id: requestedById || null,
+      created_by_id: requestedById || null,
       status: 'PENDING_APPROVAL',
       priority: (data.priority as any) || 'MEDIUM',
       required_date: data.required_date ? new Date(data.required_date) : null,
@@ -182,10 +189,16 @@ export class PRService {
       }
     }
 
+    const isRejected = data.status === 'REJECTED';
+
     await pr.update({
       status: data.status,
       reviewed_by_id: reviewerId || null,
-      approved_at: new Date(),
+      approved_by_id: !isRejected ? (reviewerId || null) : pr.approved_by_id,
+      approved_at: !isRejected ? new Date() : pr.approved_at,
+      rejected_by_id: isRejected ? (reviewerId || null) : pr.rejected_by_id,
+      rejected_at: isRejected ? new Date() : pr.rejected_at,
+      rejection_reason: isRejected ? (data.notes || 'Purchase Requisition Rejected') : pr.rejection_reason,
       notes: data.notes !== undefined ? data.notes : pr.notes,
     });
 
