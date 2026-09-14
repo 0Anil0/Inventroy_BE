@@ -226,6 +226,7 @@ export class ItemTypeService {
     hsn_code?: string;
     make?: string;
     rating?: string;
+    full_description?: string;
     unit?: string;
     base_price?: number;
     unit_rate?: number;
@@ -251,6 +252,10 @@ export class ItemTypeService {
       });
 
       const finalUnitStr = unitStr || 'PCS';
+      const fullDescStr = itemData.full_description
+        ? String(itemData.full_description).trim()
+        : (itemData.description ? String(itemData.description).trim() : `${nameStr} ${ratingStr || ''}`.trim());
+
       const existing = await ItemType.findOne({ where: { code: codeStr } });
 
       if (existing) {
@@ -263,7 +268,8 @@ export class ItemTypeService {
           unit: finalUnitStr || existing.unit,
           unit_id: unitObj ? unitObj.id : existing.unit_id,
           unit_rate: rateVal > 0 ? rateVal : existing.unit_rate,
-          description: itemData.description ? String(itemData.description).trim() : existing.description,
+          description: fullDescStr || existing.description,
+          full_description: fullDescStr || existing.full_description,
         });
         updatedCount++;
       } else {
@@ -278,7 +284,8 @@ export class ItemTypeService {
           unit_id: unitObj ? unitObj.id : null,
           unit_rate: rateVal,
           total_quantity: 0,
-          description: itemData.description ? String(itemData.description).trim() : null,
+          description: fullDescStr || null,
+          full_description: fullDescStr || null,
         });
         createdCount++;
       }

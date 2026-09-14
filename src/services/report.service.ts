@@ -521,14 +521,13 @@ export class ReportService {
     });
 
 
-    // Calculate percent share for sub-projects and categories
-    const subProjectsCosting = Object.values(subProjectCostMap).map((sp) => ({
+    let finalSubProjectsCosting = Object.values(subProjectCostMap).map((sp) => ({
       ...sp,
       money_invested: Number(sp.money_invested.toFixed(2)),
       percent_share: totalMoneyInvested > 0 ? Number(((sp.money_invested / totalMoneyInvested) * 100).toFixed(1)) : 0,
     }));
 
-    const categoryCosting = Object.values(categoryMap).map((cat) => ({
+    let finalCategoryCosting = Object.values(categoryMap).map((cat) => ({
       ...cat,
       total_cost: Number(cat.total_cost.toFixed(2)),
       percent_share: totalMoneyInvested > 0 ? Number(((cat.total_cost / totalMoneyInvested) * 100).toFixed(1)) : 0,
@@ -538,29 +537,74 @@ export class ReportService {
       const q = filters.search.toLowerCase().trim();
       itemizedLedger = itemizedLedger.filter(
         (item) =>
-          item.name.toLowerCase().includes(q) ||
-          item.code.toLowerCase().includes(q) ||
-          item.cat_no.toLowerCase().includes(q) ||
-          item.make.toLowerCase().includes(q) ||
-          item.site_name.toLowerCase().includes(q)
+          String(item.name || '').toLowerCase().includes(q) ||
+          String(item.code || '').toLowerCase().includes(q) ||
+          String(item.cat_no || '').toLowerCase().includes(q) ||
+          String(item.make || '').toLowerCase().includes(q) ||
+          String(item.site_name || '').toLowerCase().includes(q) ||
+          String(item.site_code || '').toLowerCase().includes(q) ||
+          String(item.assignment_no || '').toLowerCase().includes(q) ||
+          String(item.category || '').toLowerCase().includes(q)
       );
+
+      totalMoneyInvested = itemizedLedger.reduce((sum, i) => sum + i.total_cost, 0);
+      totalQuantityAssigned = itemizedLedger.reduce((sum, i) => sum + i.quantity, 0);
+
+      const searchSiteMap: Record<number, any> = {};
+      const searchCatMap: Record<string, any> = {};
+
+      itemizedLedger.forEach((item) => {
+        if (!searchSiteMap[item.site_id]) {
+          searchSiteMap[item.site_id] = {
+            id: item.site_id,
+            name: item.site_name,
+            code: item.site_code,
+            location: '',
+            items_count: 0,
+            total_qty: 0,
+            money_invested: 0,
+            percent_share: 0,
+          };
+        }
+        searchSiteMap[item.site_id].items_count += 1;
+        searchSiteMap[item.site_id].total_qty += item.quantity;
+        searchSiteMap[item.site_id].money_invested += item.total_cost;
+
+        if (!searchCatMap[item.category]) {
+          searchCatMap[item.category] = { category: item.category, items_count: 0, total_qty: 0, total_cost: 0 };
+        }
+        searchCatMap[item.category].items_count += 1;
+        searchCatMap[item.category].total_qty += item.quantity;
+        searchCatMap[item.category].total_cost += item.total_cost;
+      });
+
+      finalSubProjectsCosting = Object.values(searchSiteMap).map((sp: any) => ({
+        ...sp,
+        money_invested: Number(sp.money_invested.toFixed(2)),
+        percent_share: totalMoneyInvested > 0 ? Number(((sp.money_invested / totalMoneyInvested) * 100).toFixed(1)) : 0,
+      }));
+
+      finalCategoryCosting = Object.values(searchCatMap).map((cat: any) => ({
+        ...cat,
+        total_cost: Number(cat.total_cost.toFixed(2)),
+        percent_share: totalMoneyInvested > 0 ? Number(((cat.total_cost / totalMoneyInvested) * 100).toFixed(1)) : 0,
+      }));
     }
 
     return {
       summary: {
         total_projects: mainProjects.length,
-        total_money_invested: Number(totalMoneyInvested.toFixed(2)), // Actual Money put into project (incl. GST)
+        total_money_invested: Number(totalMoneyInvested.toFixed(2)),
         total_project_cost: Number(totalMoneyInvested.toFixed(2)),
         total_quantity_assigned: totalQuantityAssigned,
         total_item_types: new Set(itemizedLedger.map((i) => i.item_type_id)).size,
-        total_sub_projects: subProjectsCosting.length,
+        total_sub_projects: finalSubProjectsCosting.length,
       },
-      sub_projects_costing: subProjectsCosting,
-      category_costing: categoryCosting,
+      sub_projects_costing: finalSubProjectsCosting,
+      category_costing: finalCategoryCosting,
       itemized_ledger: itemizedLedger,
       selected_project: mainProjects.length === 1 ? mainProjects[0] : null,
     };
-
   }
 }
 
