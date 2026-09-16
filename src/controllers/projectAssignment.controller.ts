@@ -63,4 +63,28 @@ export class ProjectAssignmentController {
       res.status(400).json({ success: false, message: error.message });
     }
   }
+
+  public static async update(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      const assignment = await ProjectAssignmentService.update(id, req.body);
+      res.json({
+        success: true,
+        message: `Assignment ${assignment?.assignment_no} updated successfully`,
+        assignment,
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
+
+  public static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      const result = await ProjectAssignmentService.delete(id);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ success: false, message: error.message });
+    }
+  }
 }

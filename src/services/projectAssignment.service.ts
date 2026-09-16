@@ -174,4 +174,158 @@ export class ProjectAssignmentService {
 
     return await this.getById(assignment.id);
   }
+
+  public static async update(
+    id: number,
+    data: {
+      from_project_id?: number | null;
+      to_project_id?: number;
+      assigned_to_person?: string;
+      notes?: string;
+      items?: Array<{
+        item_type_id: number;
+        quantity: number;
+      }>;
+    }
+  ) {
+    const existing = await ProjectAssignment.findByPk(id, {
+      include: [{ model: ProjectAssignmentItem, as: 'items' }],
+    });
+    if (!existing) throw new Error('Project assignment record not found');
+
+    const oldFromId = existing.from_project_id;
+    const oldToId = existing.to_project_id;
+
+    // Revert stock for previous items
+    for (const item of existing.items || []) {
+      const itemTypeId = item.item_type_id;
+      const qty = item.quantity;
+
+      const targetInv = await ProjectInventory.findOne({
+        where: { project_id: oldToId, item_type_id: itemTypeId },
+      });
+      if (targetInv) {
+        await targetInv.update({ quantity: Math.max(0, targetInv.quantity - qty) });
+      }
+
+      const [sourceInv] = await ProjectInventory.findOrCreate({
+        where: { project_id: oldFromId, item_type_id: itemTypeId },
+        defaults: { project_id: oldFromId, item_type_id: itemTypeId, quantity: 0, min_quantity: 10 },
+      });
+      await sourceInv.update({ quantity: sourceInv.quantity + qty });
+    }
+
+    const newFromId = data.from_project_id !== undefined ? (data.from_project_id || null) : existing.from_project_id;
+    const newToId = data.to_project_id !== undefined ? Number(data.to_project_id) : existing.to_project_id;
+    const newRecipient = data.assigned_to_person !== undefined ? data.assigned_to_person.trim() : existing.assigned_to_person;
+    const newNotes = data.notes !== undefined ? (data.notes ? data.notes.trim() : null) : existing.notes;
+    const newItems = data.items && data.items.length > 0 ? data.items : (existing.items || []);
+
+    const toProject = await Project.findByPk(newToId);
+    if (!toProject) throw new Error('Target project not found');
+
+    // Deduct & add new items
+    for (const item of newItems) {
+      const itemTypeId = Number(item.item_type_id);
+      const qty = parseFloat(String(item.quantity));
+      if (qty <= 0) throw new Error('Assignment quantity must be greater than 0');
+
+      const itemType = await ItemType.findByPk(itemTypeId);
+      if (!itemType) throw new Error(`Item type ID ${itemTypeId} not found`);
+
+      const sourceInv = await ProjectInventory.findOne({
+        where: { project_id: newFromId, item_type_id: itemTypeId },
+      });
+
+      if (!sourceInv || sourceInv.quantity < qty) {
+        const avail = sourceInv ? sourceInv.quantity : 0;
+        throw new Error(`Insufficient stock for "${itemType.name}". Available: ${avail} ${itemType.unit}`);
+      }
+
+      await sourceInv.update({ quantity: sourceInv.quantity - qty });
+
+      const [targetInv] = await ProjectInventory.findOrCreate({
+        where: { project_id: newToId, item_type_id: itemTypeId },
+        defaults: { project_id: newToId, item_type_id: itemTypeId, quantity: 0, min_quantity: 10 },
+      });
+      await targetInv.update({ quantity: targetInv.quantity + qty });
+    }
+
+    // Replace line items
+    await ProjectAssignmentItem.destroy({ where: { assignment_id: existing.id } });
+    for (const item of newItems) {
+      await ProjectAssignmentItem.create({
+        assignment_id: existing.id,
+        item_type_id: Number(item.item_type_id),
+        quantity: parseFloat(String(item.quantity)),
+      });
+    }
+
+    await existing.update({
+      from_project_id: newFromId,
+      to_project_id: newToId,
+      assigned_to_person: newRecipient,
+      notes: newNotes,
+    });
+
+    return await this.getById(existing.id);
+  }
+
+  public static async delete(id: number) {
+    const assignment = await ProjectAssignment.findByPk(id, {
+      include: [{ model: ProjectAssignmentItem, as: 'items' }],
+    });
+    if (!assignment) throw new Error('Project assignment record not found');
+
+    const fromTargetId = assignment.from_project_id;
+    const toTargetId = assignment.to_project_id;
+
+    for (const item of assignment.items || []) {
+      const itemTypeId = item.item_type_id;
+      const qty = item.quantity;
+      const itemType = await ItemType.findByPk(itemTypeId);
+
+      const targetInv = await ProjectInventory.findOne({
+        where: { project_id: toTargetId, item_type_id: itemTypeId },
+      });
+      if (targetInv) {
+        const oldQty = targetInv.quantity;
+        const newQty = Math.max(0, oldQty - qty);
+        await targetInv.update({ quantity: newQty });
+
+        await StockMovement.create({
+          project_id: toTargetId,
+          item_type_id: itemTypeId,
+          type: 'OUT',
+          quantity: qty,
+          previous_quantity: oldQty,
+          new_quantity: newQty,
+          notes: `Reverted/Cancelled assignment ${assignment.assignment_no}`,
+        });
+      }
+
+      const [sourceInv] = await ProjectInventory.findOrCreate({
+        where: { project_id: fromTargetId, item_type_id: itemTypeId },
+        defaults: { project_id: fromTargetId, item_type_id: itemTypeId, quantity: 0, min_quantity: 10 },
+      });
+      const oldSrcQty = sourceInv.quantity;
+      const newSrcQty = oldSrcQty + qty;
+      await sourceInv.update({ quantity: newSrcQty });
+
+      await StockMovement.create({
+        project_id: fromTargetId,
+        item_type_id: itemTypeId,
+        type: 'IN',
+        quantity: qty,
+        previous_quantity: oldSrcQty,
+        new_quantity: newSrcQty,
+        notes: `Returned ${qty} ${itemType?.unit || 'units'} from cancelled assignment ${assignment.assignment_no}`,
+      });
+    }
+
+    await ProjectAssignmentItem.destroy({ where: { assignment_id: assignment.id } });
+    await assignment.destroy();
+
+    return { success: true, message: `Assignment ${assignment.assignment_no} cancelled & stock restored to warehouse` };
+  }
 }
