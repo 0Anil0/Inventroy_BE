@@ -24,7 +24,9 @@ export class InventoryController {
     try {
       const rawParam = req.params.projectId;
       let projectId = 0;
-      if (rawParam && rawParam !== '0' && rawParam !== 'general') {
+      if (rawParam === 'all' || rawParam === '-1') {
+        projectId = -1;
+      } else if (rawParam && rawParam !== '0' && rawParam !== 'general') {
         const parsed = parseInt(String(rawParam), 10);
         if (!isNaN(parsed)) projectId = parsed;
       }

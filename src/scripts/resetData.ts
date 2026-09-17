@@ -18,6 +18,7 @@ const runReset = async () => {
       'project_assignment_items',
       'project_assignments',
       'stock_movements',
+      'inventory_lots',
       'project_inventories',
     ];
 

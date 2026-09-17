@@ -229,10 +229,12 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
         }
       }
 
-      // 3. Update / Upsert Central Warehouse Inventory (Always project_id = null)
+      // 3. Update / Upsert Project / Central Warehouse Inventory
+      const targetProjectId = po.project_id && po.project_id !== 0 ? Number(po.project_id) : null;
+
       const existingInventory = await ProjectInventory.findOne({
         where: {
-          project_id: null,
+          project_id: targetProjectId,
           item_type_id: Number(itemData.item_type_id),
         },
         transaction,
@@ -251,7 +253,7 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
       } else {
         await ProjectInventory.create(
           {
-            project_id: null,
+            project_id: targetProjectId,
             item_type_id: Number(itemData.item_type_id),
             shelf_id: shelfId,
             rack_id: rackId,
@@ -271,7 +273,7 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
         );
       }
 
-      // 4. Record Stock Movement into Central Warehouse (project_id = null)
+      // 4. Record Stock Movement into Target Location (project_id)
       let locationNote = '';
       if (shelfId) {
         const shelf = await StorageShelf.findByPk(shelfId, { transaction });
@@ -284,14 +286,14 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
 
       await StockMovement.create(
         {
-          project_id: null,
+          project_id: targetProjectId,
           item_type_id: Number(itemData.item_type_id),
           user_id: userId,
           type: 'IN',
           quantity: receivedQtyNow,
           previous_quantity: prevQty,
           new_quantity: newQty,
-          notes: `Central Inward via GRN: ${grn_number} (PO: ${po.po_number})${po.project_id ? ` | Purpose: Project #${po.project_id}` : ''}${challan_no ? ` | Inv: ${challan_no}` : ''}${locationNote}`,
+          notes: `Stock Inward via GRN: ${grn_number} (PO: ${po.po_number})${targetProjectId ? ` | Project #${targetProjectId}` : ' | General Stock'}${challan_no ? ` | Inv: ${challan_no}` : ''}${locationNote}`,
         },
         { transaction }
       );

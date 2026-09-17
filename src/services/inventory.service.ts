@@ -1,3 +1,4 @@
+import { Op } from 'sequelize';
 import { ProjectInventory, Project, ItemType, StockMovement, User, StorageShelf, StorageRack } from '../models';
 
 export class InventoryService {
@@ -24,29 +25,91 @@ export class InventoryService {
   }
 
   /**
-   * Fetches current stock inventory for a given Project ID
+   * Fetches current stock inventory for a given Project ID (or aggregated total for -1).
+   * Returns ALL catalog items from ItemType master, displaying 0 quantity for un-stocked items.
    */
   public static async getByProjectId(projectId: number) {
-    const whereClause = (!projectId || projectId === 0 || isNaN(projectId)) ? { project_id: null } : { project_id: projectId };
+    // 1. Fetch all master catalog items
+    const allItemTypes = await ItemType.findAll({
+      order: [['code', 'ASC'], ['name', 'ASC']],
+    });
 
-    return await ProjectInventory.findAll({
+    // 2. Determine target project IDs (including child sub-projects if parent selected)
+    let targetProjectIds: Array<number | null> = [];
+    if (!projectId || projectId === 0 || isNaN(projectId)) {
+      targetProjectIds = [null, 0];
+    } else if (projectId === -1) {
+      targetProjectIds = []; // All locations
+    } else {
+      targetProjectIds = [projectId];
+      const childProjects = await Project.findAll({
+        where: { parent_id: projectId },
+        attributes: ['id'],
+      });
+      childProjects.forEach((cp) => targetProjectIds.push(cp.id));
+    }
+
+    // 3. Build query for existing inventory
+    const whereClause: any = {};
+    if (projectId !== -1) {
+      if (targetProjectIds.includes(null)) {
+        whereClause[Op.or] = [{ project_id: null }, { project_id: 0 }];
+      } else {
+        whereClause.project_id = { [Op.in]: targetProjectIds.filter((id) => id !== null) };
+      }
+    }
+
+    const existingInventories = await ProjectInventory.findAll({
       where: whereClause,
       include: [
-        {
-          model: ItemType,
-          as: 'item_type',
-        },
-        {
-          model: StorageShelf,
-          as: 'shelf',
-        },
-        {
-          model: StorageRack,
-          as: 'rack',
-        },
+        { model: ItemType, as: 'item_type' },
+        { model: StorageShelf, as: 'shelf' },
+        { model: StorageRack, as: 'rack' },
       ],
-      order: [['id', 'ASC']],
     });
+
+    // Map existing inventory by item_type_id
+    const invMap = new Map<number, { quantity: number; record: any }>();
+    for (const inv of existingInventories) {
+      const invObj = inv.toJSON();
+      const existing = invMap.get(invObj.item_type_id);
+      if (existing) {
+        existing.quantity += Number(invObj.quantity || 0);
+      } else {
+        invMap.set(invObj.item_type_id, {
+          quantity: Number(invObj.quantity || 0),
+          record: invObj,
+        });
+      }
+    }
+
+    // Combine with all master catalog items so EVERY catalog item is listed!
+    const resultList = allItemTypes.map((itemType) => {
+      const itemTypeObj = itemType.toJSON();
+      const invData = invMap.get(itemTypeObj.id);
+
+      if (invData) {
+        return {
+          ...invData.record,
+          item_type_id: itemTypeObj.id,
+          item_type: itemTypeObj,
+          quantity: invData.quantity,
+        };
+      }
+
+      return {
+        id: `virtual-${itemTypeObj.id}`,
+        project_id: projectId === -1 ? null : (projectId || null),
+        item_type_id: itemTypeObj.id,
+        item_type: itemTypeObj,
+        quantity: 0,
+        min_quantity: 10,
+        shelf: null,
+        rack: null,
+      };
+    });
+
+    return resultList;
   }
 
   /**
