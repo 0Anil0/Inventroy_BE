@@ -23,6 +23,7 @@ import { ProjectAssignment } from './ProjectAssignment';
 import { ProjectAssignmentItem } from './ProjectAssignmentItem';
 import { PurchaseRequisition } from './PurchaseRequisition';
 import { PurchaseRequisitionItem } from './PurchaseRequisitionItem';
+import { InventoryLot } from './InventoryLot';
 
 // User & Role Associations
 User.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
@@ -101,6 +102,22 @@ GoodsReceiptNoteItem.belongsTo(ItemType, { foreignKey: 'item_type_id', as: 'item
 GoodsReceiptNoteItem.belongsTo(StorageShelf, { foreignKey: 'shelf_id', as: 'shelf' });
 GoodsReceiptNoteItem.belongsTo(StorageRack, { foreignKey: 'rack_id', as: 'rack' });
 
+// InventoryLot Associations
+InventoryLot.belongsTo(ItemType, { foreignKey: 'item_type_id', as: 'item_type' });
+ItemType.hasMany(InventoryLot, { foreignKey: 'item_type_id', as: 'inventory_lots' });
+
+InventoryLot.belongsTo(PurchaseOrder, { foreignKey: 'po_id', as: 'purchase_order' });
+PurchaseOrder.hasMany(InventoryLot, { foreignKey: 'po_id', as: 'inventory_lots' });
+
+InventoryLot.belongsTo(PurchaseOrderItem, { foreignKey: 'po_item_id', as: 'po_item' });
+InventoryLot.belongsTo(GoodsReceiptNote, { foreignKey: 'grn_id', as: 'grn' });
+
+InventoryLot.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
+Project.hasMany(InventoryLot, { foreignKey: 'project_id', as: 'inventory_lots' });
+
+InventoryLot.belongsTo(StorageShelf, { foreignKey: 'shelf_id', as: 'shelf' });
+InventoryLot.belongsTo(StorageRack, { foreignKey: 'rack_id', as: 'rack' });
+
 // Project Inventory Associations
 ProjectInventory.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
 Project.hasMany(ProjectInventory, { foreignKey: 'project_id', as: 'inventory' });
@@ -129,6 +146,8 @@ ProjectAssignment.belongsTo(User, { foreignKey: 'created_by_user_id', as: 'user'
 ProjectAssignment.hasMany(ProjectAssignmentItem, { foreignKey: 'assignment_id', as: 'items', onDelete: 'CASCADE' });
 ProjectAssignmentItem.belongsTo(ProjectAssignment, { foreignKey: 'assignment_id', as: 'assignment' });
 ProjectAssignmentItem.belongsTo(ItemType, { foreignKey: 'item_type_id', as: 'item_type' });
+ProjectAssignmentItem.belongsTo(InventoryLot, { foreignKey: 'lot_id', as: 'lot' });
+ProjectAssignmentItem.belongsTo(PurchaseOrder, { foreignKey: 'po_id', as: 'purchase_order' });
 
 export {
   sequelize,
@@ -156,4 +175,5 @@ export {
   ProjectAssignmentItem,
   PurchaseRequisition,
   PurchaseRequisitionItem,
+  InventoryLot,
 };

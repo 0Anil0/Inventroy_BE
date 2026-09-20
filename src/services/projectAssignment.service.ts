@@ -6,6 +6,8 @@ import {
   ProjectInventory,
   StockMovement,
   User,
+  InventoryLot,
+  PurchaseOrder,
 } from '../models';
 
 export class ProjectAssignmentService {
@@ -27,7 +29,11 @@ export class ProjectAssignmentService {
         {
           model: ProjectAssignmentItem,
           as: 'items',
-          include: [{ model: ItemType, as: 'item_type' }],
+          include: [
+            { model: ItemType, as: 'item_type' },
+            { model: InventoryLot, as: 'lot' },
+            { model: PurchaseOrder, as: 'purchase_order', attributes: ['id', 'po_number'] },
+          ],
         },
       ],
       order: [['id', 'DESC']],
@@ -46,7 +52,11 @@ export class ProjectAssignmentService {
         {
           model: ProjectAssignmentItem,
           as: 'items',
-          include: [{ model: ItemType, as: 'item_type' }],
+          include: [
+            { model: ItemType, as: 'item_type' },
+            { model: InventoryLot, as: 'lot' },
+            { model: PurchaseOrder, as: 'purchase_order', attributes: ['id', 'po_number'] },
+          ],
         },
       ],
     });
@@ -60,6 +70,7 @@ export class ProjectAssignmentService {
     created_by_user_id?: number;
     items: Array<{
       item_type_id: number;
+      lot_id?: number | null;
       quantity: number;
     }>;
   }) {
@@ -84,7 +95,16 @@ export class ProjectAssignmentService {
     const year = new Date().getFullYear();
     const assignment_no = `ASN-${year}-${String(count + 1).padStart(4, '0')}`;
 
-    // Process Stock Deductions & Additions atomically
+    // Process Stock Lot Deductions & Additions atomically
+    const processedItems: Array<{
+      item_type_id: number;
+      lot_id: number | null;
+      po_id: number | null;
+      unit_price: number;
+      total_cost: number;
+      quantity: number;
+    }> = [];
+
     for (const item of items) {
       const itemTypeId = Number(item.item_type_id);
       const qty = parseFloat(String(item.quantity));
@@ -96,60 +116,89 @@ export class ProjectAssignmentService {
       const itemType = await ItemType.findByPk(itemTypeId);
       if (!itemType) throw new Error(`Item type ID ${itemTypeId} not found`);
 
-      // 1. Check & Deduct from Source Inventory (General Store or Source Site)
-      const sourceInventory = await ProjectInventory.findOne({
-        where: { project_id: fromTargetId, item_type_id: itemTypeId },
-      });
-
-      if (!sourceInventory || sourceInventory.quantity < qty) {
-        const available = sourceInventory ? sourceInventory.quantity : 0;
-        throw new Error(
-          `Insufficient stock for "${itemType.name}". Available in warehouse: ${available} ${itemType.unit}`
-        );
+      let selectedLot: InventoryLot | null = null;
+      if (item.lot_id) {
+        selectedLot = await InventoryLot.findByPk(Number(item.lot_id));
       }
 
-      const oldSourceQty = sourceInventory.quantity;
-      const newSourceQty = oldSourceQty - qty;
-      await sourceInventory.update({ quantity: newSourceQty });
+      // If no lot_id passed directly, find active available lot for this item
+      if (!selectedLot) {
+        selectedLot = await InventoryLot.findOne({
+          where: {
+            item_type_id: itemTypeId,
+            available_qty: { [Symbol.for('gte')]: qty },
+          },
+          order: [['id', 'ASC']],
+        });
+      }
+
+      let unitPrice = Number(itemType.unit_rate || 0);
+      let poId: number | null = null;
+      let lotId: number | null = null;
+      let sourceProjectId: number | null = fromTargetId;
+
+      if (selectedLot) {
+        if (selectedLot.available_qty < qty) {
+          throw new Error(
+            `Selected PO Lot #${selectedLot.lot_number || selectedLot.id} has insufficient stock. Requested: ${qty}, Available: ${selectedLot.available_qty}`
+          );
+        }
+
+        unitPrice = Number(selectedLot.unit_price || unitPrice);
+        poId = selectedLot.po_id;
+        lotId = selectedLot.id;
+        sourceProjectId = selectedLot.project_id ? Number(selectedLot.project_id) : null;
+
+        // Deduct from InventoryLot
+        const oldAvailable = selectedLot.available_qty;
+        const newAvailable = oldAvailable - qty;
+        const newAssigned = (selectedLot.assigned_qty || 0) + qty;
+
+        await selectedLot.update({
+          available_qty: newAvailable,
+          assigned_qty: newAssigned,
+        });
+      }
+
+      // 1. Deduct from Aggregate Source Inventory (where sourceProjectId is lot's origin project_id or fromTargetId)
+      const sourceInventory = await ProjectInventory.findOne({
+        where: { project_id: sourceProjectId, item_type_id: itemTypeId },
+      });
+
+      if (sourceInventory) {
+        const oldSourceQty = sourceInventory.quantity;
+        const newSourceQty = Math.max(0, oldSourceQty - qty);
+        await sourceInventory.update({ quantity: newSourceQty });
+      }
 
       // Record Audit Movement Log for Source (Deduction)
-      const sourceName = fromTargetId ? 'Source Site' : 'General Store / Main Warehouse';
+      const sourceName = sourceProjectId ? 'Project Lot Store' : 'General Store / Main Warehouse';
       await StockMovement.create({
-        project_id: fromTargetId,
+        project_id: sourceProjectId,
         item_type_id: itemTypeId,
         user_id: created_by_user_id || null,
         type: 'TRANSFER',
         quantity: qty,
-        previous_quantity: oldSourceQty,
-        new_quantity: newSourceQty,
-        notes: `Assigned ${qty} ${itemType.unit} to project "${toProject.name}" (${assignment_no})`,
+        previous_quantity: sourceInventory ? sourceInventory.quantity + qty : qty,
+        new_quantity: sourceInventory ? sourceInventory.quantity : 0,
+        notes: `Assigned ${qty} ${itemType.unit} @ ₹${unitPrice} to project "${toProject.name}" (${assignment_no})`,
       });
 
-      // 2. Add to Target Project Inventory
-      const [targetInventory] = await ProjectInventory.findOrCreate({
-        where: { project_id: toTargetId, item_type_id: itemTypeId },
-        defaults: {
-          project_id: toTargetId,
-          item_type_id: itemTypeId,
-          quantity: 0,
-          min_quantity: 10,
-        },
+      // Note: Assigned material is dispatched for project execution, so it is NOT added to available warehouse stock.
+
+      // Update ItemType total_quantity across all unassigned warehouse inventories
+      const totalStock = await ProjectInventory.sum('quantity', {
+        where: { item_type_id: itemTypeId },
       });
+      await itemType.update({ total_quantity: totalStock || 0 });
 
-      const oldTargetQty = targetInventory.quantity;
-      const newTargetQty = oldTargetQty + qty;
-      await targetInventory.update({ quantity: newTargetQty });
-
-      // Record Audit Movement Log for Target (Addition)
-      await StockMovement.create({
-        project_id: toTargetId,
+      processedItems.push({
         item_type_id: itemTypeId,
-        user_id: created_by_user_id || null,
-        type: 'TRANSFER',
+        lot_id: lotId,
+        po_id: poId,
+        unit_price: unitPrice,
+        total_cost: Number((qty * unitPrice).toFixed(2)),
         quantity: qty,
-        previous_quantity: oldTargetQty,
-        new_quantity: newTargetQty,
-        notes: `Received assignment of ${qty} ${itemType.unit} from ${sourceName} (${assignment_no})`,
       });
     }
 
@@ -163,12 +212,16 @@ export class ProjectAssignmentService {
       notes: notes ? notes.trim() : null,
     });
 
-    // Create Assignment Line Items
-    for (const item of items) {
+    // Create Assignment Line Items with exact purchase rate and cost
+    for (const item of processedItems) {
       await ProjectAssignmentItem.create({
         assignment_id: assignment.id,
-        item_type_id: Number(item.item_type_id),
-        quantity: parseFloat(String(item.quantity)),
+        item_type_id: item.item_type_id,
+        lot_id: item.lot_id,
+        po_id: item.po_id,
+        unit_price: item.unit_price,
+        total_cost: item.total_cost,
+        quantity: item.quantity,
       });
     }
 
@@ -184,6 +237,7 @@ export class ProjectAssignmentService {
       notes?: string;
       items?: Array<{
         item_type_id: number;
+        lot_id?: number | null;
         quantity: number;
       }>;
     }
@@ -193,28 +247,42 @@ export class ProjectAssignmentService {
     });
     if (!existing) throw new Error('Project assignment record not found');
 
-    const oldFromId = existing.from_project_id;
-    const oldToId = existing.to_project_id;
-
-    // Revert stock for previous items
+    // Revert existing line items stock back to source InventoryLots & source ProjectInventory
     for (const item of existing.items || []) {
       const itemTypeId = item.item_type_id;
       const qty = item.quantity;
+      let sourceProjectId: number | null = existing.from_project_id;
 
-      const targetInv = await ProjectInventory.findOne({
-        where: { project_id: oldToId, item_type_id: itemTypeId },
-      });
-      if (targetInv) {
-        await targetInv.update({ quantity: Math.max(0, targetInv.quantity - qty) });
+      if (item.lot_id) {
+        const lot = await InventoryLot.findByPk(item.lot_id);
+        if (lot) {
+          sourceProjectId = lot.project_id ? Number(lot.project_id) : null;
+          await lot.update({
+            available_qty: lot.available_qty + qty,
+            assigned_qty: Math.max(0, (lot.assigned_qty || 0) - qty),
+          });
+        }
       }
 
-      const [sourceInv] = await ProjectInventory.findOrCreate({
-        where: { project_id: oldFromId, item_type_id: itemTypeId },
-        defaults: { project_id: oldFromId, item_type_id: itemTypeId, quantity: 0, min_quantity: 10 },
+      const sourceInv = await ProjectInventory.findOne({
+        where: { project_id: sourceProjectId, item_type_id: itemTypeId },
       });
-      await sourceInv.update({ quantity: sourceInv.quantity + qty });
+      if (sourceInv) {
+        await sourceInv.update({ quantity: sourceInv.quantity + qty });
+      }
+
+      const totalStock = await ProjectInventory.sum('quantity', {
+        where: { item_type_id: itemTypeId },
+      });
+      const itemType = await ItemType.findByPk(itemTypeId);
+      if (itemType) {
+        await itemType.update({ total_quantity: totalStock || 0 });
+      }
     }
 
+    await ProjectAssignmentItem.destroy({ where: { assignment_id: existing.id } });
+
+    // Re-create using updated item specs
     const newFromId = data.from_project_id !== undefined ? (data.from_project_id || null) : existing.from_project_id;
     const newToId = data.to_project_id !== undefined ? Number(data.to_project_id) : existing.to_project_id;
     const newRecipient = data.assigned_to_person !== undefined ? data.assigned_to_person.trim() : existing.assigned_to_person;
@@ -224,7 +292,15 @@ export class ProjectAssignmentService {
     const toProject = await Project.findByPk(newToId);
     if (!toProject) throw new Error('Target project not found');
 
-    // Deduct & add new items
+    const processedItems: Array<{
+      item_type_id: number;
+      lot_id: number | null;
+      po_id: number | null;
+      unit_price: number;
+      total_cost: number;
+      quantity: number;
+    }> = [];
+
     for (const item of newItems) {
       const itemTypeId = Number(item.item_type_id);
       const qty = parseFloat(String(item.quantity));
@@ -233,31 +309,65 @@ export class ProjectAssignmentService {
       const itemType = await ItemType.findByPk(itemTypeId);
       if (!itemType) throw new Error(`Item type ID ${itemTypeId} not found`);
 
-      const sourceInv = await ProjectInventory.findOne({
-        where: { project_id: newFromId, item_type_id: itemTypeId },
-      });
-
-      if (!sourceInv || sourceInv.quantity < qty) {
-        const avail = sourceInv ? sourceInv.quantity : 0;
-        throw new Error(`Insufficient stock for "${itemType.name}". Available: ${avail} ${itemType.unit}`);
+      let selectedLot: InventoryLot | null = null;
+      if (item.lot_id) {
+        selectedLot = await InventoryLot.findByPk(Number(item.lot_id));
       }
 
-      await sourceInv.update({ quantity: sourceInv.quantity - qty });
+      let unitPrice = Number(itemType.unit_rate || 0);
+      let poId: number | null = null;
+      let lotId: number | null = null;
+      let sourceProjectId: number | null = newFromId;
 
-      const [targetInv] = await ProjectInventory.findOrCreate({
-        where: { project_id: newToId, item_type_id: itemTypeId },
-        defaults: { project_id: newToId, item_type_id: itemTypeId, quantity: 0, min_quantity: 10 },
+      if (selectedLot) {
+        if (selectedLot.available_qty < qty) {
+          throw new Error(
+            `Selected PO Lot #${selectedLot.lot_number || selectedLot.id} has insufficient stock. Requested: ${qty}, Available: ${selectedLot.available_qty}`
+          );
+        }
+
+        unitPrice = Number(selectedLot.unit_price || unitPrice);
+        poId = selectedLot.po_id;
+        lotId = selectedLot.id;
+        sourceProjectId = selectedLot.project_id ? Number(selectedLot.project_id) : null;
+
+        await selectedLot.update({
+          available_qty: selectedLot.available_qty - qty,
+          assigned_qty: (selectedLot.assigned_qty || 0) + qty,
+        });
+      }
+
+      const sourceInv = await ProjectInventory.findOne({
+        where: { project_id: sourceProjectId, item_type_id: itemTypeId },
       });
-      await targetInv.update({ quantity: targetInv.quantity + qty });
+      if (sourceInv) {
+        await sourceInv.update({ quantity: Math.max(0, sourceInv.quantity - qty) });
+      }
+
+      const totalStock = await ProjectInventory.sum('quantity', {
+        where: { item_type_id: itemTypeId },
+      });
+      await itemType.update({ total_quantity: totalStock || 0 });
+
+      processedItems.push({
+        item_type_id: itemTypeId,
+        lot_id: lotId,
+        po_id: poId,
+        unit_price: unitPrice,
+        total_cost: Number((qty * unitPrice).toFixed(2)),
+        quantity: qty,
+      });
     }
 
-    // Replace line items
-    await ProjectAssignmentItem.destroy({ where: { assignment_id: existing.id } });
-    for (const item of newItems) {
+    for (const item of processedItems) {
       await ProjectAssignmentItem.create({
         assignment_id: existing.id,
-        item_type_id: Number(item.item_type_id),
-        quantity: parseFloat(String(item.quantity)),
+        item_type_id: item.item_type_id,
+        lot_id: item.lot_id,
+        po_id: item.po_id,
+        unit_price: item.unit_price,
+        total_cost: item.total_cost,
+        quantity: item.quantity,
       });
     }
 
@@ -277,43 +387,34 @@ export class ProjectAssignmentService {
     });
     if (!assignment) throw new Error('Project assignment record not found');
 
-    const fromTargetId = assignment.from_project_id;
-    const toTargetId = assignment.to_project_id;
-
     for (const item of assignment.items || []) {
       const itemTypeId = item.item_type_id;
       const qty = item.quantity;
       const itemType = await ItemType.findByPk(itemTypeId);
+      let sourceProjectId: number | null = assignment.from_project_id;
 
-      const targetInv = await ProjectInventory.findOne({
-        where: { project_id: toTargetId, item_type_id: itemTypeId },
-      });
-      if (targetInv) {
-        const oldQty = targetInv.quantity;
-        const newQty = Math.max(0, oldQty - qty);
-        await targetInv.update({ quantity: newQty });
-
-        await StockMovement.create({
-          project_id: toTargetId,
-          item_type_id: itemTypeId,
-          type: 'OUT',
-          quantity: qty,
-          previous_quantity: oldQty,
-          new_quantity: newQty,
-          notes: `Reverted/Cancelled assignment ${assignment.assignment_no}`,
-        });
+      // Restore InventoryLot stock
+      if (item.lot_id) {
+        const lot = await InventoryLot.findByPk(item.lot_id);
+        if (lot) {
+          sourceProjectId = lot.project_id ? Number(lot.project_id) : null;
+          await lot.update({
+            available_qty: lot.available_qty + qty,
+            assigned_qty: Math.max(0, (lot.assigned_qty || 0) - qty),
+          });
+        }
       }
 
       const [sourceInv] = await ProjectInventory.findOrCreate({
-        where: { project_id: fromTargetId, item_type_id: itemTypeId },
-        defaults: { project_id: fromTargetId, item_type_id: itemTypeId, quantity: 0, min_quantity: 10 },
+        where: { project_id: sourceProjectId, item_type_id: itemTypeId },
+        defaults: { project_id: sourceProjectId, item_type_id: itemTypeId, quantity: 0, min_quantity: 10 },
       });
       const oldSrcQty = sourceInv.quantity;
       const newSrcQty = oldSrcQty + qty;
       await sourceInv.update({ quantity: newSrcQty });
 
       await StockMovement.create({
-        project_id: fromTargetId,
+        project_id: sourceProjectId,
         item_type_id: itemTypeId,
         type: 'IN',
         quantity: qty,
@@ -321,6 +422,13 @@ export class ProjectAssignmentService {
         new_quantity: newSrcQty,
         notes: `Returned ${qty} ${itemType?.unit || 'units'} from cancelled assignment ${assignment.assignment_no}`,
       });
+
+      const totalStock = await ProjectInventory.sum('quantity', {
+        where: { item_type_id: itemTypeId },
+      });
+      if (itemType) {
+        await itemType.update({ total_quantity: totalStock || 0 });
+      }
     }
 
     await ProjectAssignmentItem.destroy({ where: { assignment_id: assignment.id } });
@@ -329,3 +437,4 @@ export class ProjectAssignmentService {
     return { success: true, message: `Assignment ${assignment.assignment_no} cancelled & stock restored to warehouse` };
   }
 }
+

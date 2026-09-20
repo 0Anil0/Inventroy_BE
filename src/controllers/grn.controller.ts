@@ -16,6 +16,7 @@ import {
   Unit,
   StorageShelf,
   StorageRack,
+  InventoryLot,
 } from '../models';
 
 export const getGRNs = async (req: Request, res: Response): Promise<void> => {
@@ -220,17 +221,42 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
         { transaction }
       );
 
-      // 2. Update PurchaseOrderItem received_qty if linked to a PO item line
+      // 2. Update PurchaseOrderItem received_qty and get unit purchase rate
+      let unitPrice = 0;
       if (itemData.po_item_id) {
         const poItem = await PurchaseOrderItem.findByPk(itemData.po_item_id, { transaction });
         if (poItem) {
           poItem.received_qty = (poItem.received_qty || 0) + receivedQtyNow;
           await poItem.save({ transaction });
+          unitPrice = Number(poItem.unit_price || 0);
         }
       }
 
-      // 3. Update / Upsert Project / Central Warehouse Inventory
+      if (!unitPrice) {
+        const catItem = await ItemType.findByPk(Number(itemData.item_type_id), { transaction });
+        unitPrice = Number(catItem?.unit_rate || 0);
+      }
+
+      // 3. Update / Upsert Project / Central Warehouse Inventory & Create Inventory Stock Lot
       const targetProjectId = po.project_id && po.project_id !== 0 ? Number(po.project_id) : null;
+
+      await InventoryLot.create(
+        {
+          item_type_id: Number(itemData.item_type_id),
+          po_id: po.id,
+          po_item_id: itemData.po_item_id ? Number(itemData.po_item_id) : null,
+          grn_id: grn.id,
+          project_id: targetProjectId,
+          unit_price: unitPrice,
+          received_qty: receivedQtyNow,
+          available_qty: receivedQtyNow,
+          assigned_qty: 0,
+          shelf_id: shelfId,
+          rack_id: rackId,
+          lot_number: `${po.po_number || 'PO'}-${grn_number}`,
+        },
+        { transaction }
+      );
 
       const existingInventory = await ProjectInventory.findOne({
         where: {

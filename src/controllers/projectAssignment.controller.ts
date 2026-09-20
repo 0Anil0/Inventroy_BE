@@ -50,6 +50,7 @@ export class ProjectAssignmentController {
         created_by_user_id: userId,
         items: items.map((i: any) => ({
           item_type_id: parseInt(String(i.item_type_id), 10),
+          lot_id: i.lot_id ? parseInt(String(i.lot_id), 10) : undefined,
           quantity: parseFloat(String(i.quantity)),
         })),
       });

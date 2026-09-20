@@ -438,61 +438,39 @@ export class InventoryService {
    * Auto-syncs stock from received GRNs and Purchase Orders to ensure ProjectInventory and ItemType total_quantity are 100% accurate
    */
   public static async syncAllStockFromReceived() {
-    const { GoodsReceiptNoteItem, GoodsReceiptNote, PurchaseOrder, PurchaseOrderItem } = require('../models');
+    const { InventoryLot, ProjectInventory, ItemType } = require('../models');
 
-    // 1. Process all received GRN items (All stock enters Central Warehouse project_id = null)
-    const grnItems = await GoodsReceiptNoteItem.findAll({
-      include: [{ model: GoodsReceiptNote, as: 'grn' }],
-    });
+    // 1. Reset all ProjectInventory quantities to 0
+    await ProjectInventory.update({ quantity: 0 }, { where: {} });
 
-    for (const item of grnItems) {
-      const itemTypeId = Number(item.item_type_id);
-      const qty = Number(item.received_qty || 0);
+    // 2. Aggregate available_qty from active InventoryLot records
+    const activeLots = await InventoryLot.findAll();
+    const lotMap = new Map<string, number>();
 
-      if (qty <= 0 || !itemTypeId) continue;
+    for (const lot of activeLots) {
+      const pId = lot.project_id ? Number(lot.project_id) : 0;
+      const itemTypeId = Number(lot.item_type_id);
+      const key = `${pId}_${itemTypeId}`;
+      const current = lotMap.get(key) || 0;
+      lotMap.set(key, current + Number(lot.available_qty || 0));
+    }
+
+    for (const [key, availQty] of lotMap.entries()) {
+      const [pIdStr, itemTypeIdStr] = key.split('_');
+      const pId = Number(pIdStr) === 0 ? null : Number(pIdStr);
+      const itemTypeId = Number(itemTypeIdStr);
 
       const [projInv] = await ProjectInventory.findOrCreate({
-        where: { project_id: null, item_type_id: itemTypeId },
+        where: { project_id: pId, item_type_id: itemTypeId },
         defaults: {
-          project_id: null,
+          project_id: pId,
           item_type_id: itemTypeId,
-          quantity: 0,
+          quantity: availQty,
           min_quantity: 10,
         },
       });
 
-      if (projInv.quantity < qty) {
-        await projInv.update({ quantity: qty });
-      }
-    }
-
-    // 2. Process all RECEIVED Purchase Orders
-    const receivedPOs = await PurchaseOrder.findAll({
-      where: { status: 'RECEIVED' },
-      include: [{ model: PurchaseOrderItem, as: 'items' }],
-    });
-
-    for (const po of receivedPOs) {
-      for (const item of po.items || []) {
-        const itemTypeId = Number(item.item_type_id);
-        const qty = Number(item.received_qty || item.ordered_qty || 0);
-
-        if (qty <= 0 || !itemTypeId) continue;
-
-        const [projInv] = await ProjectInventory.findOrCreate({
-          where: { project_id: null, item_type_id: itemTypeId },
-          defaults: {
-            project_id: null,
-            item_type_id: itemTypeId,
-            quantity: 0,
-            min_quantity: 10,
-          },
-        });
-
-        if (projInv.quantity < qty) {
-          await projInv.update({ quantity: qty });
-        }
-      }
+      await projInv.update({ quantity: availQty });
     }
 
     // 3. Recalculate ItemType total_quantity across all ProjectInventory records

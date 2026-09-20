@@ -460,15 +460,15 @@ export class ReportService {
         let discPercent = 0;
         let unitCost = 0; // Net Landed Unit Cost (incl. GST)
 
-        if (latestPoItemMap[item.item_type_id]) {
+        if (item.unit_price !== undefined && item.unit_price !== null && Number(item.unit_price) > 0) {
+          baseUnitPrice = Number(item.unit_price);
+          unitCost = Number((baseUnitPrice * 1.18).toFixed(2));
+        } else if (latestPoItemMap[item.item_type_id]) {
           const poInfo = latestPoItemMap[item.item_type_id];
           baseUnitPrice = poInfo.base_unit_price;
           gstPercent = poInfo.gst_percent;
           discPercent = poInfo.disc_percent;
           unitCost = poInfo.effective_unit_cost;
-        } else if (item.unit_cost !== undefined && item.unit_cost !== null && Number(item.unit_cost) > 0) {
-          baseUnitPrice = Number(item.unit_cost);
-          unitCost = Number((baseUnitPrice * 1.18).toFixed(2));
         } else if (item.item_type?.unit_rate && Number(item.item_type.unit_rate) > 0) {
           baseUnitPrice = Number(item.item_type.unit_rate);
           unitCost = Number((baseUnitPrice * 1.18).toFixed(2));

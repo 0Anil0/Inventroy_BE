@@ -32,6 +32,7 @@ import grnRoutes from './routes/grn.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import projectAssignmentRoutes from './routes/projectAssignment.routes';
 import prRoutes from './routes/pr.routes';
+import inventoryLotRoutes from './routes/inventoryLot.routes';
 import { errorHandler } from './middlewares/error.middleware';
 
 const app = express();
@@ -63,6 +64,7 @@ app.use('/api', dashboardRoutes);
 app.use('/api', storageLocationRoutes);
 app.use('/api', inventoryRoutes);
 app.use('/api', prRoutes);
+app.use('/api', inventoryLotRoutes);
 app.use('/api/grn', grnRoutes);
 app.use('/api/project-assignments', projectAssignmentRoutes);
 
@@ -117,6 +119,10 @@ const startServer = async () => {
         'ALTER TABLE "purchase_orders" ADD COLUMN IF NOT EXISTS "rejected_by_id" INTEGER;',
         'ALTER TABLE "purchase_orders" ADD COLUMN IF NOT EXISTS "rejected_at" TIMESTAMP WITH TIME ZONE;',
         'ALTER TABLE "purchase_orders" ADD COLUMN IF NOT EXISTS "rejection_reason" VARCHAR(255);',
+        'ALTER TABLE "project_assignment_items" ADD COLUMN IF NOT EXISTS "lot_id" INTEGER;',
+        'ALTER TABLE "project_assignment_items" ADD COLUMN IF NOT EXISTS "po_id" INTEGER;',
+        'ALTER TABLE "project_assignment_items" ADD COLUMN IF NOT EXISTS "unit_price" DOUBLE PRECISION;',
+        'ALTER TABLE "project_assignment_items" ADD COLUMN IF NOT EXISTS "total_cost" DOUBLE PRECISION;',
       ];
 
       for (const q of alterQueries) {
