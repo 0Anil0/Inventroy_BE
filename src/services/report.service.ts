@@ -456,13 +456,22 @@ export class ReportService {
 
         // Determine Effective Purchase Unit Cost (Incl GST)
         let baseUnitPrice = 0;
-        let gstPercent = 18;
+        let gstPercent = 0;
         let discPercent = 0;
         let unitCost = 0; // Net Landed Unit Cost (incl. GST)
 
         if (item.unit_price !== undefined && item.unit_price !== null && Number(item.unit_price) > 0) {
           baseUnitPrice = Number(item.unit_price);
-          unitCost = Number((baseUnitPrice * 1.18).toFixed(2));
+          if (item.po_id && latestPoItemMap[item.item_type_id]) {
+            const poInfo = latestPoItemMap[item.item_type_id];
+            gstPercent = poInfo.gst_percent;
+            discPercent = poInfo.disc_percent;
+            unitCost = Number((baseUnitPrice * (1 + gstPercent / 100)).toFixed(2));
+          } else {
+            gstPercent = 0;
+            discPercent = 0;
+            unitCost = baseUnitPrice;
+          }
         } else if (latestPoItemMap[item.item_type_id]) {
           const poInfo = latestPoItemMap[item.item_type_id];
           baseUnitPrice = poInfo.base_unit_price;
@@ -471,7 +480,9 @@ export class ReportService {
           unitCost = poInfo.effective_unit_cost;
         } else if (item.item_type?.unit_rate && Number(item.item_type.unit_rate) > 0) {
           baseUnitPrice = Number(item.item_type.unit_rate);
-          unitCost = Number((baseUnitPrice * 1.18).toFixed(2));
+          gstPercent = 0;
+          discPercent = 0;
+          unitCost = baseUnitPrice;
         }
 
         const lineCost = Number((qty * unitCost).toFixed(2));

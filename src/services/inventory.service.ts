@@ -1,5 +1,5 @@
 import { Op } from 'sequelize';
-import { ProjectInventory, Project, ItemType, StockMovement, User, StorageShelf, StorageRack } from '../models';
+import { ProjectInventory, Project, ItemType, StockMovement, User, StorageShelf, StorageRack, InventoryLot } from '../models';
 
 export class InventoryService {
   /**
@@ -116,17 +116,34 @@ export class InventoryService {
    * Adjusts / allocates stock quantity from Central Warehouse to Project Site
    * - Deducts allocated quantity from Central Warehouse (item_types.total_quantity)
    * - Increases Project Inventory quantity (project_inventory.quantity)
+   * - Creates / Updates InventoryLot with batch & purchase rate info
    */
   public static async adjustQuantity(data: {
     project_id: number;
     item_type_id: number;
     amount: number; // Target quantity for project
     min_quantity?: number;
+    unit_price?: number;
+    lot_number?: string;
+    shelf_id?: number;
+    rack_id?: number;
     adjustment_type?: 'ADD' | 'REMOVE' | 'SET';
     user_id?: number;
     notes?: string;
   }) {
-    const { project_id, item_type_id, amount, min_quantity, adjustment_type, user_id, notes } = data;
+    const {
+      project_id,
+      item_type_id,
+      amount,
+      min_quantity,
+      unit_price,
+      lot_number,
+      shelf_id,
+      rack_id,
+      adjustment_type,
+      user_id,
+      notes,
+    } = data;
 
     const targetProjectId = (project_id && project_id !== 0) ? project_id : null;
     let projectName = 'General Stock / Main Store';
@@ -147,6 +164,8 @@ export class InventoryService {
         item_type_id,
         quantity: 0,
         min_quantity: min_quantity !== undefined ? min_quantity : 0,
+        shelf_id: shelf_id || null,
+        rack_id: rack_id || null,
       },
     });
 
@@ -166,6 +185,8 @@ export class InventoryService {
     if (min_quantity !== undefined) {
       updateFields.min_quantity = min_quantity;
     }
+    if (shelf_id) updateFields.shelf_id = shelf_id;
+    if (rack_id) updateFields.rack_id = rack_id;
 
     await record.update(updateFields);
 
@@ -174,6 +195,25 @@ export class InventoryService {
       where: { item_type_id },
     });
     await itemType.update({ total_quantity: totalStock || 0 });
+
+    // Create InventoryLot entry for positive stock additions / setting opening balance
+    const lotQty = diff > 0 ? diff : (adjustment_type === 'SET' && targetProjectQty > 0 ? targetProjectQty : 0);
+    if (lotQty > 0) {
+      const unitRateVal = unit_price !== undefined ? unit_price : Number(itemType.unit_rate || 0);
+      const generatedLotNo = lot_number || `LOT-OPENING-${Date.now().toString().slice(-6)}`;
+
+      await InventoryLot.create({
+        item_type_id,
+        project_id: targetProjectId,
+        unit_price: unitRateVal,
+        received_qty: lotQty,
+        available_qty: lotQty,
+        assigned_qty: 0,
+        shelf_id: shelf_id || null,
+        rack_id: rack_id || null,
+        lot_number: generatedLotNo,
+      });
+    }
 
     // Record Audit Movement Log
     if (diff !== 0 || adjustment_type) {
@@ -211,7 +251,7 @@ export class InventoryService {
   }
 
   /**
-   * Batch adjusts/creates stock quantities for multiple items in a project
+   * Batch adjusts/creates stock quantities for multiple items in a project with rate & batch support
    */
   public static async batchAdjustQuantity(data: {
     project_id: number;
@@ -220,6 +260,10 @@ export class InventoryService {
       quantity?: number;
       initial_quantity?: number;
       min_quantity?: number;
+      unit_price?: number;
+      lot_number?: string;
+      shelf_id?: number;
+      rack_id?: number;
     }>;
     user_id?: number;
     notes?: string;
@@ -240,9 +284,13 @@ export class InventoryService {
         item_type_id: item.item_type_id,
         amount: targetQty,
         min_quantity: item.min_quantity,
+        unit_price: item.unit_price,
+        lot_number: item.lot_number,
+        shelf_id: item.shelf_id,
+        rack_id: item.rack_id,
         adjustment_type: 'SET',
         user_id,
-        notes: notes || 'Batch item allocation to project',
+        notes: notes || 'Batch item opening stock entry',
       });
       if (updated) results.push(updated);
     }
@@ -251,17 +299,18 @@ export class InventoryService {
   }
 
   /**
-   * Transfer stock between two projects
+   * Transfer stock between two projects / PO lots with complete audit trail
    */
   public static async transferStock(data: {
     from_project_id: number;
     to_project_id: number;
     item_type_id: number;
     quantity: number;
+    lot_id?: number;
     user_id?: number;
     notes?: string;
   }) {
-    const { from_project_id, to_project_id, item_type_id, quantity, user_id, notes } = data;
+    const { from_project_id, to_project_id, item_type_id, quantity, lot_id, user_id, notes } = data;
 
     const fromTargetId = (from_project_id && from_project_id !== 0) ? from_project_id : null;
     const toTargetId = (to_project_id && to_project_id !== 0) ? to_project_id : null;
@@ -288,12 +337,62 @@ export class InventoryService {
     const fromProject = fromTargetId ? await Project.findByPk(fromTargetId) : null;
     const toProject = toTargetId ? await Project.findByPk(toTargetId) : null;
 
-    const fromName = fromProject ? fromProject.name : 'General Stock / Main Store';
-    const toName = toProject ? toProject.name : 'General Stock / Main Store';
+    const fromName = fromProject ? `${fromProject.name} (${fromProject.code})` : 'General Stock / Main Store';
+    const toName = toProject ? `${toProject.name} (${toProject.code})` : 'General Stock / Main Store';
 
     const itemType = sourceInventory.item_type || (await ItemType.findByPk(item_type_id));
+    if (!itemType) throw new Error('Item type not found');
 
-    // Deduct from Source Location
+    // Generate unique Transfer Reference ID
+    const count = await StockMovement.count({ where: { type: 'TRANSFER' } });
+    const year = new Date().getFullYear();
+    const transfer_ref = `TRF-${year}-${String(Math.floor(count / 2) + 1).padStart(4, '0')}`;
+
+    // Deduct from / Add to specific InventoryLot if lot_id specified or auto-picked
+    let sourceLot: InventoryLot | null = null;
+    if (lot_id) {
+      sourceLot = await InventoryLot.findByPk(lot_id);
+      if (!sourceLot || sourceLot.available_qty < quantity) {
+        throw new Error(
+          `Selected PO Lot #${sourceLot?.lot_number || lot_id} has insufficient stock. Requested: ${quantity}, Available: ${sourceLot?.available_qty || 0}`
+        );
+      }
+    } else {
+      sourceLot = await InventoryLot.findOne({
+        where: {
+          project_id: fromTargetId,
+          item_type_id,
+          available_qty: { [Op.gte]: quantity },
+        },
+        order: [['id', 'ASC']],
+      });
+    }
+
+    let lotNote = '';
+    if (sourceLot) {
+      lotNote = ` | Lot #${sourceLot.lot_number || sourceLot.id} @ ₹${sourceLot.unit_price}/unit`;
+      await sourceLot.update({
+        available_qty: sourceLot.available_qty - quantity,
+      });
+
+      // Replicate/Create InventoryLot in Destination Project
+      await InventoryLot.create({
+        item_type_id,
+        project_id: toTargetId,
+        po_id: sourceLot.po_id,
+        po_item_id: sourceLot.po_item_id,
+        grn_id: sourceLot.grn_id,
+        unit_price: sourceLot.unit_price,
+        received_qty: quantity,
+        available_qty: quantity,
+        assigned_qty: 0,
+        lot_number: sourceLot.lot_number ? `${sourceLot.lot_number}-TRF` : `${transfer_ref}-LOT`,
+        shelf_id: sourceLot.shelf_id,
+        rack_id: sourceLot.rack_id,
+      });
+    }
+
+    // Deduct from Source Location Inventory
     const oldSourceQty = sourceInventory.quantity;
     const newSourceQty = oldSourceQty - quantity;
     await sourceInventory.update({ quantity: newSourceQty });
@@ -306,10 +405,10 @@ export class InventoryService {
       quantity,
       previous_quantity: oldSourceQty,
       new_quantity: newSourceQty,
-      notes: notes || `Transferred ${quantity} ${itemType?.unit || 'units'} to ${toName}`,
+      notes: `[Ref: ${transfer_ref}] Transferred ${quantity} ${itemType?.unit || 'units'} to "${toName}"${lotNote}${notes ? ` | ${notes}` : ''}`,
     });
 
-    // Add to Destination Location
+    // Add to Destination Location Inventory
     const [destInventory] = await ProjectInventory.findOrCreate({
       where: { project_id: toTargetId, item_type_id },
       defaults: {
@@ -332,10 +431,11 @@ export class InventoryService {
       quantity,
       previous_quantity: oldDestQty,
       new_quantity: newDestQty,
-      notes: notes || `Received ${quantity} ${itemType?.unit || 'units'} from ${fromName}`,
+      notes: `[Ref: ${transfer_ref}] Received ${quantity} ${itemType?.unit || 'units'} from "${fromName}"${lotNote}${notes ? ` | ${notes}` : ''}`,
     });
 
     return {
+      transfer_ref,
       source: await ProjectInventory.findByPk(sourceInventory.id, {
         include: [
           { model: ItemType, as: 'item_type' },
@@ -502,6 +602,7 @@ export class InventoryService {
       MaterialIssue,
       PurchaseRequisitionItem,
       PurchaseRequisition,
+      InventoryLot,
     } = require('../models');
 
     // 0. Delete Purchase Requisition Items & Requisitions
@@ -524,7 +625,8 @@ export class InventoryService {
     await PurchaseOrderItem.destroy({ where: {}, force: true });
     await PurchaseOrder.destroy({ where: {}, force: true });
 
-    // 5. Delete Stock Movements
+    // 5. Delete Inventory Lots & Stock Movements
+    if (InventoryLot) await InventoryLot.destroy({ where: {}, force: true });
     await StockMovement.destroy({ where: {}, force: true });
 
     // 6. Delete Project Inventories
