@@ -15,19 +15,19 @@ export class PRService {
     status?: string;
     priority?: string;
     search?: string;
+    page?: number;
+    limit?: number;
   }) {
     const where: any = {};
-    if (filters?.project_id) where.project_id = filters.project_id;
+    if (filters?.project_id !== undefined && filters?.project_id !== null) {
+      if (filters.project_id === 0) {
+        where.project_id = null;
+      } else {
+        where.project_id = filters.project_id;
+      }
+    }
     if (filters?.status && filters.status !== 'ALL') where.status = filters.status;
     if (filters?.priority && filters.priority !== 'ALL') where.priority = filters.priority;
-
-    if (filters?.search) {
-      const q = `%${filters.search.trim()}%`;
-      where[Op.or] = [
-        { pr_number: { [Op.iLike]: q } },
-        { notes: { [Op.iLike]: q } },
-      ];
-    }
 
     const prList = await PurchaseRequisition.findAll({
       where,
@@ -47,7 +47,55 @@ export class PRService {
       order: [['id', 'DESC']],
     });
 
-    return prList;
+    let filtered = prList.map((pr) => (pr.toJSON ? pr.toJSON() : pr));
+
+    // Server-side search filter
+    if (filters?.search && filters.search.trim()) {
+      const q = filters.search.toLowerCase().trim();
+      filtered = filtered.filter((pr: any) => {
+        const matchPrNo = (pr.pr_number || '').toLowerCase().includes(q);
+        const matchNotes = (pr.notes || '').toLowerCase().includes(q);
+        const matchProj =
+          (pr.project?.name || '').toLowerCase().includes(q) ||
+          (pr.project?.code || '').toLowerCase().includes(q);
+        const matchCreator =
+          (pr.created_by_user?.username || '').toLowerCase().includes(q) ||
+          (pr.requested_by_user?.username || '').toLowerCase().includes(q);
+        const matchApprover = (pr.approved_by_user?.username || '').toLowerCase().includes(q);
+
+        const matchItems = (pr.items || []).some(
+          (i: any) =>
+            (i.item_type?.name || '').toLowerCase().includes(q) ||
+            (i.item_type?.code || '').toLowerCase().includes(q) ||
+            (i.cat_no || i.item_type?.cat_no || '').toLowerCase().includes(q) ||
+            (i.make || i.item_type?.make || '').toLowerCase().includes(q)
+        );
+
+        return matchPrNo || matchNotes || matchProj || matchCreator || matchApprover || matchItems;
+      });
+    }
+
+    const total = filtered.length;
+    const pendingCount = filtered.filter((p: any) => p.status === 'PENDING_APPROVAL').length;
+    const approvedCount = filtered.filter(
+      (p: any) => p.status === 'APPROVED' || p.status === 'PARTIALLY_APPROVED'
+    ).length;
+    const convertedCount = filtered.filter((p: any) => p.status === 'PO_CREATED').length;
+
+    // Server-side pagination
+    let pageItems = filtered;
+    if (filters?.page && filters?.limit) {
+      const start = (filters.page - 1) * filters.limit;
+      pageItems = filtered.slice(start, start + filters.limit);
+    }
+
+    return {
+      items: pageItems,
+      total,
+      pendingCount,
+      approvedCount,
+      convertedCount,
+    };
   }
 
   public static async getById(id: number) {

@@ -5,18 +5,29 @@ import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 export class POController {
   public static async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { project_id, vendor_id } = req.query;
+      const { project_id, vendor_id, search, status, page, limit } = req.query;
       const user = (req as AuthenticatedRequest).user;
       const currentUser = user ? { userId: user.userId, role: user.role } : undefined;
 
-      const purchaseOrders = await POService.getAll(
+      const result = await POService.getAll(
         {
-          project_id: project_id ? parseInt(String(project_id), 10) : undefined,
+          project_id:
+            project_id !== undefined && project_id !== 'undefined' && project_id !== 'null'
+              ? parseInt(String(project_id), 10)
+              : undefined,
           vendor_id: vendor_id ? parseInt(String(vendor_id), 10) : undefined,
+          search: search ? String(search) : undefined,
+          status: status ? String(status) : undefined,
+          page: page ? parseInt(String(page), 10) : undefined,
+          limit: limit ? parseInt(String(limit), 10) : undefined,
         },
         currentUser
       );
-      res.json({ success: true, purchaseOrders });
+      res.json({
+        success: true,
+        purchaseOrders: result.purchaseOrders,
+        total: result.total,
+      });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }
@@ -156,13 +167,15 @@ export class POController {
 
   public static async getItemTracking(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { item_type_id, vendor_id, project_id, status, search } = req.query;
+      const { item_type_id, vendor_id, project_id, status, search, page, limit } = req.query;
       const result = await POService.getItemTracking({
         item_type_id: item_type_id ? parseInt(String(item_type_id), 10) : undefined,
         vendor_id: vendor_id ? parseInt(String(vendor_id), 10) : undefined,
         project_id: project_id ? parseInt(String(project_id), 10) : undefined,
         status: status ? String(status) : undefined,
         search: search ? String(search) : undefined,
+        page: page ? parseInt(String(page), 10) : undefined,
+        limit: limit ? parseInt(String(limit), 10) : undefined,
       });
       res.json(result);
     } catch (error: any) {

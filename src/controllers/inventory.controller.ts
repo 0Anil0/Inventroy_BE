@@ -30,8 +30,28 @@ export class InventoryController {
         const parsed = parseInt(String(rawParam), 10);
         if (!isNaN(parsed)) projectId = parsed;
       }
-      const inventory = await InventoryService.getByProjectId(projectId);
-      res.json({ success: true, inventory });
+
+      const search = req.query.search ? String(req.query.search) : undefined;
+      const filterMode = req.query.filterMode ? (String(req.query.filterMode) as 'ALL' | 'LOW_STOCK') : undefined;
+      const startDate = req.query.startDate ? String(req.query.startDate) : undefined;
+      const endDate = req.query.endDate ? String(req.query.endDate) : undefined;
+      const page = req.query.page ? parseInt(String(req.query.page), 10) : undefined;
+      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : undefined;
+
+      const result = await InventoryService.getByProjectId({
+        projectId,
+        search,
+        filterMode,
+        startDate,
+        endDate,
+        page,
+        limit,
+      });
+
+      res.json({
+        success: true,
+        ...result,
+      });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }

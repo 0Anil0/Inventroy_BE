@@ -4,12 +4,33 @@ import { ProjectAssignmentService } from '../services/projectAssignment.service'
 export class ProjectAssignmentController {
   public static async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const to_project_id = req.query.to_project_id
-        ? parseInt(String(req.query.to_project_id), 10)
-        : undefined;
+      const search = req.query.search ? String(req.query.search) : undefined;
+      const to_project_id =
+        req.query.to_project_id && req.query.to_project_id !== 'null' && req.query.to_project_id !== 'undefined'
+          ? parseInt(String(req.query.to_project_id), 10)
+          : undefined;
+      const from_date = req.query.from_date ? String(req.query.from_date) : undefined;
+      const to_date = req.query.to_date ? String(req.query.to_date) : undefined;
+      const page = req.query.page ? parseInt(String(req.query.page), 10) : undefined;
+      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : undefined;
 
-      const assignments = await ProjectAssignmentService.getAll({ to_project_id });
-      res.json({ success: true, assignments });
+      const result = await ProjectAssignmentService.getAll({
+        search,
+        to_project_id,
+        from_date,
+        to_date,
+        page,
+        limit,
+      });
+
+      res.json({
+        success: true,
+        assignments: result.assignments,
+        total: result.total,
+        totalAssignmentsCount: result.totalAssignmentsCount,
+        uniqueProjectsAssigned: result.uniqueProjectsAssigned,
+        totalUnitsDispatched: result.totalUnitsDispatched,
+      });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }

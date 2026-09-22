@@ -4,12 +4,15 @@ import { ReportService } from '../services/report.service';
 export class ReportController {
   public static async getStockSummary(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { project_id, health } = req.query;
+      const { project_id, health, search, page, limit } = req.query;
       const data = await ReportService.getStockSummaryReport({
         project_id: project_id ? parseInt(String(project_id), 10) : undefined,
         health: health ? String(health) as any : undefined,
+        search: search ? String(search) : undefined,
+        page: page ? parseInt(String(page), 10) : undefined,
+        limit: limit ? parseInt(String(limit), 10) : undefined,
       });
-      res.json({ success: true, reports: data });
+      res.json({ success: true, reports: data.reports, total: data.total, page: data.page, limit: data.limit, totalPages: data.totalPages });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message || 'Failed to generate stock report' });
     }
@@ -17,14 +20,17 @@ export class ReportController {
 
   public static async getPurchaseOrders(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { vendor_id, status, startDate, endDate } = req.query;
+      const { vendor_id, status, startDate, endDate, search, page, limit } = req.query;
       const data = await ReportService.getPurchaseOrdersReport({
         vendor_id: vendor_id ? parseInt(String(vendor_id), 10) : undefined,
         status: status ? String(status) : undefined,
         startDate: startDate ? String(startDate) : undefined,
         endDate: endDate ? String(endDate) : undefined,
+        search: search ? String(search) : undefined,
+        page: page ? parseInt(String(page), 10) : undefined,
+        limit: limit ? parseInt(String(limit), 10) : undefined,
       });
-      res.json({ success: true, reports: data });
+      res.json({ success: true, reports: data.reports, total: data.total, page: data.page, limit: data.limit, totalPages: data.totalPages });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message || 'Failed to generate PO report' });
     }
@@ -61,15 +67,18 @@ export class ReportController {
 
   public static async getAuditLedger(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { project_id, item_type_id, type, startDate, endDate } = req.query;
+      const { project_id, item_type_id, type, startDate, endDate, search, page, limit } = req.query;
       const data = await ReportService.getAuditLedgerReport({
         project_id: project_id ? parseInt(String(project_id), 10) : undefined,
         item_type_id: item_type_id ? parseInt(String(item_type_id), 10) : undefined,
         type: type ? String(type) : undefined,
         startDate: startDate ? String(startDate) : undefined,
         endDate: endDate ? String(endDate) : undefined,
+        search: search ? String(search) : undefined,
+        page: page ? parseInt(String(page), 10) : undefined,
+        limit: limit ? parseInt(String(limit), 10) : undefined,
       });
-      res.json({ success: true, reports: data });
+      res.json({ success: true, reports: data.reports, total: data.total, page: data.page, limit: data.limit, totalPages: data.totalPages });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message || 'Failed to generate audit ledger report' });
     }
@@ -77,11 +86,13 @@ export class ReportController {
 
   public static async getProcurementDistribution(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { project_id, search, health } = req.query;
+      const { project_id, search, health, page, limit } = req.query;
       const data = await ReportService.getProcurementDistributionReport({
         project_id: project_id ? parseInt(String(project_id), 10) : undefined,
         search: search ? String(search) : undefined,
         health: health ? String(health) as any : undefined,
+        page: page ? parseInt(String(page), 10) : undefined,
+        limit: limit ? parseInt(String(limit), 10) : undefined,
       });
       res.json({ success: true, report: data });
     } catch (error: any) {
@@ -91,10 +102,12 @@ export class ReportController {
 
   public static async getProjectFinancialCosting(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { project_id, search } = req.query;
+      const { project_id, search, page, limit } = req.query;
       const data = await ReportService.getProjectFinancialCostingReport({
         project_id: project_id ? parseInt(String(project_id), 10) : undefined,
         search: search ? String(search) : undefined,
+        page: page ? parseInt(String(page), 10) : undefined,
+        limit: limit ? parseInt(String(limit), 10) : undefined,
       });
       res.json({ success: true, report: data });
     } catch (error: any) {

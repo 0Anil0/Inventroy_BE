@@ -21,7 +21,7 @@ import {
 
 export const getGRNs = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { vendor_id, project_id, po_id, from_date, to_date, search } = req.query;
+    const { vendor_id, project_id, po_id, from_date, to_date, search, page, limit } = req.query;
 
     const where: any = {};
     const poWhere: any = {};
@@ -45,16 +45,7 @@ export const getGRNs = async (req: Request, res: Response): Promise<void> => {
       where.received_date = { [Op.lte]: String(to_date) };
     }
 
-    if (search) {
-      const s = `%${String(search).trim()}%`;
-      where[Op.or] = [
-        { grn_number: { [Op.iLike]: s } },
-        { challan_no: { [Op.iLike]: s } },
-        { vehicle_no: { [Op.iLike]: s } },
-      ];
-    }
-
-    const grns = await GoodsReceiptNote.findAll({
+    const allGrns = await GoodsReceiptNote.findAll({
       where,
       order: [['id', 'DESC']],
       include: [
@@ -87,7 +78,56 @@ export const getGRNs = async (req: Request, res: Response): Promise<void> => {
         },
       ],
     });
-    res.json(grns);
+
+    let filtered = allGrns.map((g) => (g.toJSON ? g.toJSON() : g));
+
+    if (search && String(search).trim()) {
+      const q = String(search).toLowerCase().trim();
+      filtered = filtered.filter((g: any) => {
+        const matchGrn = (g.grn_number || '').toLowerCase().includes(q);
+        const matchChallan = (g.challan_no || '').toLowerCase().includes(q);
+        const matchVehicle = (g.vehicle_no || '').toLowerCase().includes(q);
+        const matchPo = (g.purchase_order?.po_number || '').toLowerCase().includes(q);
+        const matchVendor = (g.purchase_order?.vendor?.name || '').toLowerCase().includes(q);
+        const matchProject =
+          (g.project?.name || '').toLowerCase().includes(q) ||
+          (g.project?.code || '').toLowerCase().includes(q) ||
+          (g.purchase_order?.project?.name || '').toLowerCase().includes(q) ||
+          (g.purchase_order?.project?.code || '').toLowerCase().includes(q);
+
+        const matchItems = (g.items || []).some(
+          (i: any) =>
+            (i.item_type?.name || '').toLowerCase().includes(q) ||
+            (i.item_type?.code || '').toLowerCase().includes(q) ||
+            (i.item_type?.cat_no || '').toLowerCase().includes(q) ||
+            (i.item_type?.make || '').toLowerCase().includes(q)
+        );
+
+        return matchGrn || matchChallan || matchVehicle || matchPo || matchVendor || matchProject || matchItems;
+      });
+    }
+
+    const total = filtered.length;
+    const pageNum = page ? parseInt(String(page), 10) : undefined;
+    const limitNum = limit ? parseInt(String(limit), 10) : undefined;
+
+    let pageItems = filtered;
+    if (pageNum && limitNum) {
+      const start = (pageNum - 1) * limitNum;
+      pageItems = filtered.slice(start, start + limitNum);
+    }
+
+    if (pageNum || limitNum || req.query.paginate === 'true') {
+      res.json({
+        success: true,
+        grns: pageItems,
+        total,
+        page: pageNum || 1,
+        limit: limitNum || total,
+      });
+    } else {
+      res.json(filtered);
+    }
   } catch (error: any) {
     console.error('Error fetching GRNs:', error);
     res.status(500).json({ message: 'Error fetching Goods Receipt Notes', error: error.message });

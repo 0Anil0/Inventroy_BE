@@ -11,13 +11,20 @@ import {
 } from '../models';
 
 export class ProjectAssignmentService {
-  public static async getAll(params?: { to_project_id?: number }) {
+  public static async getAll(params?: {
+    search?: string;
+    to_project_id?: number;
+    from_date?: string;
+    to_date?: string;
+    page?: number;
+    limit?: number;
+  }) {
     const where: any = {};
     if (params?.to_project_id) {
       where.to_project_id = params.to_project_id;
     }
 
-    return await ProjectAssignment.findAll({
+    const allAssignments = await ProjectAssignment.findAll({
       where,
       include: [
         {
@@ -38,6 +45,70 @@ export class ProjectAssignmentService {
       ],
       order: [['id', 'DESC']],
     });
+
+    let filtered = allAssignments.map((a) => (a.toJSON ? a.toJSON() : a));
+
+    // Server-side search filter
+    if (params?.search && params.search.trim()) {
+      const q = params.search.toLowerCase().trim();
+      filtered = filtered.filter((a: any) => {
+        const matchNo = (a.assignment_no || '').toLowerCase().includes(q);
+        const matchPerson = (a.assigned_to_person || '').toLowerCase().includes(q);
+        const matchNotes = (a.notes || '').toLowerCase().includes(q);
+        const matchProj =
+          (a.to_project?.name || '').toLowerCase().includes(q) ||
+          (a.to_project?.code || '').toLowerCase().includes(q) ||
+          (a.to_project?.parent?.name || '').toLowerCase().includes(q) ||
+          (a.to_project?.parent?.code || '').toLowerCase().includes(q);
+
+        const matchItems = (a.items || []).some(
+          (i: any) =>
+            (i.item_type?.name || '').toLowerCase().includes(q) ||
+            (i.item_type?.code || '').toLowerCase().includes(q) ||
+            (i.item_type?.cat_no || '').toLowerCase().includes(q) ||
+            (i.item_type?.make || '').toLowerCase().includes(q) ||
+            (i.purchase_order?.po_number || '').toLowerCase().includes(q)
+        );
+
+        return matchNo || matchPerson || matchNotes || matchProj || matchItems;
+      });
+    }
+
+    // Server-side date range filter
+    if (params?.from_date && params?.to_date) {
+      const start = new Date(params.from_date).getTime();
+      const end = new Date(params.to_date).getTime() + 86400000;
+      filtered = filtered.filter((a: any) => {
+        const d = new Date(a.assignment_date || a.createdAt).getTime();
+        return d >= start && d <= end;
+      });
+    }
+
+    // Aggregated stats over whole filtered dataset
+    const totalAssignmentsCount = filtered.length;
+    const uniqueProjectsAssigned = new Set(filtered.map((a: any) => a.to_project_id)).size;
+    const totalUnitsDispatched = filtered.reduce(
+      (sum: number, a: any) =>
+        sum + (a.items || []).reduce((iSum: number, item: any) => iSum + Number(item.quantity || 0), 0),
+      0
+    );
+
+    const total = filtered.length;
+
+    // Server-side pagination
+    let pageItems = filtered;
+    if (params?.page && params?.limit) {
+      const start = (params.page - 1) * params.limit;
+      pageItems = filtered.slice(start, start + params.limit);
+    }
+
+    return {
+      assignments: pageItems,
+      total,
+      totalAssignmentsCount,
+      uniqueProjectsAssigned,
+      totalUnitsDispatched,
+    };
   }
 
   public static async getById(id: number) {

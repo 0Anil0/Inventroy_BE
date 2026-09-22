@@ -4,8 +4,20 @@ import { POApproverService } from '../services/po-approver.service';
 export class POApproverController {
   public static async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const approvers = await POApproverService.getAll();
-      res.json({ success: true, approvers });
+      const { page, limit, search } = req.query;
+      const result = await POApproverService.getAll({
+        page: page ? parseInt(String(page), 10) : undefined,
+        limit: limit ? parseInt(String(limit), 10) : undefined,
+        search: search ? String(search) : undefined,
+      });
+      res.json({
+        success: true,
+        approvers: result.approvers,
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+      });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }

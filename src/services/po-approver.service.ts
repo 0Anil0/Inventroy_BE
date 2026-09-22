@@ -1,18 +1,46 @@
+import { Op } from 'sequelize';
 import { POApprover, User, Role } from '../models';
 
 export class POApproverService {
-  public static async getAll() {
-    return await POApprover.findAll({
+  public static async getAll(params?: { page?: number; limit?: number; search?: string }) {
+    const whereUser: any = {};
+    if (params?.search && params.search.trim()) {
+      const q = `%${params.search.trim()}%`;
+      whereUser[Op.or] = [
+        { username: { [Op.iLike]: q } },
+        { email: { [Op.iLike]: q } },
+      ];
+    }
+
+    const approvers = await POApprover.findAll({
       include: [
         {
           model: User,
           as: 'user',
+          where: params?.search ? whereUser : undefined,
           attributes: ['id', 'username', 'email'],
           include: [{ model: Role, as: 'role', attributes: ['id', 'name'] }],
         },
       ],
       order: [['id', 'ASC']],
     });
+
+    const total = approvers.length;
+    let pageItems = approvers;
+
+    if (params?.page && params?.limit) {
+      const page = params.page > 0 ? params.page : 1;
+      const limit = params.limit > 0 ? params.limit : 10;
+      pageItems = approvers.slice((page - 1) * limit, page * limit);
+    }
+
+    return {
+      approvers: pageItems,
+      total,
+      page: params?.page || 1,
+      limit: params?.limit || 10,
+      totalPages: params?.limit ? Math.ceil(total / params.limit) || 1 : 1,
+    };
   }
 
   public static async addApprover(data: { user_id: number; min_amount?: number; max_amount?: number }) {

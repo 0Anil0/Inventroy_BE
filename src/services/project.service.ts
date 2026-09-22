@@ -1,14 +1,57 @@
 import { Project } from '../models';
 
 export class ProjectService {
-  public static async getAll() {
-    return await Project.findAll({
+  public static async getAll(params?: {
+    search?: string;
+    category?: 'ALL' | 'MAIN' | 'SUB';
+    page?: number;
+    limit?: number;
+  }) {
+    const { search, category, page, limit } = params || {};
+    const { Op } = require('sequelize');
+
+    const where: any = {};
+
+    if (search && search.trim()) {
+      const q = `%${search.trim()}%`;
+      const isPg = Project.sequelize?.getDialect() === 'postgres';
+      const likeOp = isPg ? Op.iLike : Op.like;
+      where[Op.or] = [
+        { name: { [likeOp]: q } },
+        { code: { [likeOp]: q } },
+        { location: { [likeOp]: q } },
+      ];
+    }
+
+    if (category === 'MAIN') {
+      where.parent_id = null;
+    } else if (category === 'SUB') {
+      where.parent_id = { [Op.ne]: null };
+    }
+
+    const { count, rows } = await Project.findAndCountAll({
+      where,
       include: [
         { model: Project, as: 'parent', attributes: ['id', 'name', 'code'] },
         { model: Project, as: 'sub_projects', attributes: ['id', 'name', 'code'] },
       ],
       order: [['id', 'ASC']],
+      offset: page && limit ? (page - 1) * limit : undefined,
+      limit: page && limit ? limit : undefined,
+      distinct: true,
     });
+
+    const totalCount = await Project.count();
+    const mainCount = await Project.count({ where: { parent_id: null } });
+    const subCount = await Project.count({ where: { parent_id: { [Op.ne]: null } } });
+
+    return {
+      projects: rows,
+      total: count,
+      totalCount,
+      mainCount,
+      subCount,
+    };
   }
 
   public static async getById(id: number) {

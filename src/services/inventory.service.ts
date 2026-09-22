@@ -27,8 +27,21 @@ export class InventoryService {
   /**
    * Fetches current stock inventory for a given Project ID (or aggregated total for -1).
    * Returns ALL catalog items from ItemType master, displaying 0 quantity for un-stocked items.
+  /**
+   * Fetches current stock inventory for a given Project ID (or aggregated total for -1).
+   * Supports backend search, filtering (LOW_STOCK), date range, and pagination.
    */
-  public static async getByProjectId(projectId: number) {
+  public static async getByProjectId(params: {
+    projectId: number;
+    search?: string;
+    filterMode?: 'ALL' | 'LOW_STOCK';
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { projectId, search, filterMode, startDate, endDate, page, limit } = params;
+
     // 1. Fetch all master catalog items
     const allItemTypes = await ItemType.findAll({
       order: [['code', 'ASC'], ['name', 'ASC']],
@@ -36,7 +49,7 @@ export class InventoryService {
 
     // 2. Determine target project IDs (including child sub-projects if parent selected)
     let targetProjectIds: Array<number | null> = [];
-    if (!projectId || projectId === 0 || isNaN(projectId)) {
+    if (projectId === undefined || projectId === null || isNaN(projectId) || projectId === 0) {
       targetProjectIds = [null, 0];
     } else if (projectId === -1) {
       targetProjectIds = []; // All locations
@@ -83,8 +96,8 @@ export class InventoryService {
       }
     }
 
-    // Combine with all master catalog items so EVERY catalog item is listed!
-    const resultList = allItemTypes.map((itemType) => {
+    // Combine with all master catalog items
+    let resultList = allItemTypes.map((itemType) => {
       const itemTypeObj = itemType.toJSON();
       const invData = invMap.get(itemTypeObj.id);
 
@@ -109,7 +122,70 @@ export class InventoryService {
       };
     });
 
-    return resultList;
+    // Server-Side Search Filtering
+    if (search && search.trim()) {
+      const q = search.toLowerCase().trim();
+      resultList = resultList.filter((inv) => {
+        const item = inv.item_type;
+        if (!item) return false;
+        const shelfName = (inv.shelf?.name || '').toLowerCase();
+        const shelfCode = (inv.shelf?.code || '').toLowerCase();
+        const rackName = (inv.rack?.name || '').toLowerCase();
+        const rackCode = (inv.rack?.rack_code || '').toLowerCase();
+        const locationText = `${shelfName} ${shelfCode} ${rackName} ${rackCode}`;
+
+        return (
+          (item.name || '').toLowerCase().includes(q) ||
+          (item.code || '').toLowerCase().includes(q) ||
+          (item.cat_no || '').toLowerCase().includes(q) ||
+          (item.make || '').toLowerCase().includes(q) ||
+          (item.rating || '').toLowerCase().includes(q) ||
+          (item.full_description || '').toLowerCase().includes(q) ||
+          (item.description || '').toLowerCase().includes(q) ||
+          (item.unit || '').toLowerCase().includes(q) ||
+          locationText.includes(q) ||
+          inv.quantity.toString().includes(q)
+        );
+      });
+    }
+
+    // Server-Side Low Stock Filtering
+    if (filterMode === 'LOW_STOCK') {
+      resultList = resultList.filter((inv) => inv.quantity <= (inv.min_quantity || 10));
+    }
+
+    // Server-Side Date Range Filtering
+    if (startDate && endDate) {
+      resultList = resultList.filter((inv: any) => {
+        if (!inv.updatedAt) return true;
+        const itemDate = new Date(inv.updatedAt).toISOString().slice(0, 10);
+        return itemDate >= startDate && itemDate <= endDate;
+      });
+    }
+
+    // Calculate aggregated statistics from whole dataset before pagination
+    const totalStockUnits = resultList.reduce((sum, item) => sum + item.quantity, 0);
+    const outOfStockCount = resultList.filter((item) => item.quantity === 0).length;
+    const lowStockCount = resultList.filter(
+      (item) => item.quantity > 0 && item.quantity <= (item.min_quantity || 10)
+    ).length;
+
+    const totalRecords = resultList.length;
+
+    // Server-Side Pagination
+    let pageItems = resultList;
+    if (page && limit) {
+      const start = (page - 1) * limit;
+      pageItems = resultList.slice(start, start + limit);
+    }
+
+    return {
+      inventory: pageItems,
+      total: totalRecords,
+      totalStockUnits,
+      outOfStockCount,
+      lowStockCount,
+    };
   }
 
   /**

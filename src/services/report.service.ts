@@ -19,6 +19,9 @@ export class ReportService {
   public static async getStockSummaryReport(filters?: {
     project_id?: number;
     health?: 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
+    search?: string;
+    page?: number;
+    limit?: number;
   }) {
     const where: any = {};
     if (filters?.project_id) {
@@ -34,9 +37,10 @@ export class ReportService {
       order: [['project_id', 'ASC'], ['id', 'ASC']],
     });
 
-    // Filter health status if requested
+    let filtered = inventoryList;
+
     if (filters?.health && filters.health !== 'ALL') {
-      return inventoryList.filter((item) => {
+      filtered = filtered.filter((item) => {
         if (filters.health === 'OUT_OF_STOCK') return item.quantity === 0;
         if (filters.health === 'LOW_STOCK') return item.quantity > 0 && item.quantity <= (item.min_quantity || 10);
         if (filters.health === 'IN_STOCK') return item.quantity > (item.min_quantity || 10);
@@ -44,7 +48,36 @@ export class ReportService {
       });
     }
 
-    return inventoryList;
+    if (filters?.search && filters.search.trim()) {
+      const q = filters.search.trim().toLowerCase();
+      filtered = filtered.filter((item) => {
+        const projName = (item.project?.name || 'Central Warehouse').toLowerCase();
+        const projCode = (item.project?.code || '').toLowerCase();
+        const itemName = (item.item_type?.name || '').toLowerCase();
+        const itemCode = (item.item_type?.code || '').toLowerCase();
+        const catNo = (item.item_type?.cat_no || '').toLowerCase();
+        const make = (item.item_type?.make || '').toLowerCase();
+        const rating = (item.item_type?.rating || '').toLowerCase();
+        return projName.includes(q) || projCode.includes(q) || itemName.includes(q) || itemCode.includes(q) || catNo.includes(q) || make.includes(q) || rating.includes(q);
+      });
+    }
+
+    const total = filtered.length;
+    let pageItems = filtered;
+
+    if (filters?.page && filters?.limit) {
+      const page = filters.page > 0 ? filters.page : 1;
+      const limit = filters.limit > 0 ? filters.limit : 15;
+      pageItems = filtered.slice((page - 1) * limit, page * limit);
+    }
+
+    return {
+      reports: pageItems,
+      total,
+      page: filters?.page || 1,
+      limit: filters?.limit || 15,
+      totalPages: filters?.limit ? Math.ceil(total / filters.limit) || 1 : 1,
+    };
   }
 
   /**
@@ -55,10 +88,13 @@ export class ReportService {
     status?: string;
     startDate?: string;
     endDate?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
   }) {
     const where: any = {};
     if (filters?.vendor_id) where.vendor_id = filters.vendor_id;
-    if (filters?.status) where.status = filters.status;
+    if (filters?.status && filters.status !== 'ALL') where.status = filters.status;
 
     if (filters?.startDate && filters?.endDate) {
       where.order_date = {
@@ -66,7 +102,7 @@ export class ReportService {
       };
     }
 
-    return await PurchaseOrder.findAll({
+    const poList = await PurchaseOrder.findAll({
       where,
       include: [
         { model: Vendor, as: 'vendor', attributes: ['id', 'name', 'phone', 'email', 'tax_id'] },
@@ -79,6 +115,43 @@ export class ReportService {
       ],
       order: [['order_date', 'DESC']],
     });
+
+    let filtered = poList;
+
+    if (filters?.search && filters.search.trim()) {
+      const q = filters.search.trim().toLowerCase();
+      filtered = filtered.filter((item) => {
+        const poNum = (item.po_number || '').toLowerCase();
+        const vendorName = (item.vendor?.name || '').toLowerCase();
+        const projName = (item.project?.name || '').toLowerCase();
+        const projCode = (item.project?.code || '').toLowerCase();
+        const status = (item.status || '').toLowerCase();
+        const itemMatch = item.items?.some((pi: any) => {
+          const iName = (pi.item_type?.name || '').toLowerCase();
+          const iCode = (pi.item_type?.code || '').toLowerCase();
+          return iName.includes(q) || iCode.includes(q);
+        });
+
+        return poNum.includes(q) || vendorName.includes(q) || projName.includes(q) || projCode.includes(q) || status.includes(q) || itemMatch;
+      });
+    }
+
+    const total = filtered.length;
+    let pageItems = filtered;
+
+    if (filters?.page && filters?.limit) {
+      const page = filters.page > 0 ? filters.page : 1;
+      const limit = filters.limit > 0 ? filters.limit : 15;
+      pageItems = filtered.slice((page - 1) * limit, page * limit);
+    }
+
+    return {
+      reports: pageItems,
+      total,
+      page: filters?.page || 1,
+      limit: filters?.limit || 15,
+      totalPages: filters?.limit ? Math.ceil(total / filters.limit) || 1 : 1,
+    };
   }
 
   /**
@@ -154,6 +227,9 @@ export class ReportService {
     type?: string;
     startDate?: string;
     endDate?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
   }) {
     const where: any = {};
     if (filters?.project_id) where.project_id = filters.project_id;
@@ -166,7 +242,7 @@ export class ReportService {
       };
     }
 
-    return await StockMovement.findAll({
+    const movements = await StockMovement.findAll({
       where,
       include: [
         { model: Project, as: 'project', attributes: ['id', 'name', 'code'] },
@@ -174,8 +250,39 @@ export class ReportService {
         { model: User, as: 'user', attributes: ['id', 'username', 'email'] },
       ],
       order: [['createdAt', 'DESC']],
-      limit: 200,
     });
+
+    let filtered = movements;
+
+    if (filters?.search && filters.search.trim()) {
+      const q = filters.search.trim().toLowerCase();
+      filtered = filtered.filter((item) => {
+        const type = (item.type || '').toLowerCase();
+        const projName = (item.project?.name || '').toLowerCase();
+        const itemCode = (item.item_type?.code || '').toLowerCase();
+        const itemName = (item.item_type?.name || '').toLowerCase();
+        const username = (item.user?.username || '').toLowerCase();
+        const notes = (item.notes || '').toLowerCase();
+        return type.includes(q) || projName.includes(q) || itemCode.includes(q) || itemName.includes(q) || username.includes(q) || notes.includes(q);
+      });
+    }
+
+    const total = filtered.length;
+    let pageItems = filtered;
+
+    if (filters?.page && filters?.limit) {
+      const page = filters.page > 0 ? filters.page : 1;
+      const limit = filters.limit > 0 ? filters.limit : 15;
+      pageItems = filtered.slice((page - 1) * limit, page * limit);
+    }
+
+    return {
+      reports: pageItems,
+      total,
+      page: filters?.page || 1,
+      limit: filters?.limit || 15,
+      totalPages: filters?.limit ? Math.ceil(total / filters.limit) || 1 : 1,
+    };
   }
 
   /**
@@ -185,6 +292,8 @@ export class ReportService {
     project_id?: number;
     search?: string;
     health?: 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
+    page?: number;
+    limit?: number;
   }) {
     const itemTypes = await ItemType.findAll({
       order: [['id', 'ASC']],
@@ -198,31 +307,25 @@ export class ReportService {
           where: {
             status: { [Op.notIn]: ['CANCELLED', 'REJECTED'] },
           },
-          include: [
-            { model: Project, as: 'project', attributes: ['id', 'name', 'code'] },
-          ],
+          include: [{ model: Project, as: 'project', attributes: ['id', 'name', 'code'] }],
         },
       ],
     });
 
     const inventoryList = await ProjectInventory.findAll({
-      include: [
-        { model: Project, as: 'project', attributes: ['id', 'name', 'code'] },
-      ],
+      include: [{ model: Project, as: 'project', attributes: ['id', 'name', 'code'] }],
     });
 
     const reports = itemTypes.map((item) => {
-      const itemPoItems = poItems.filter((poi) => poi.item_type_id === item.id);
-
+      const itemPoItems = poItems.filter((poi: any) => poi.item_type_id === item.id);
       let general_po_qty = 0;
       let project_po_qty = 0;
       const projectPoMap: Record<number, { project_id: number; project_name: string; project_code: string; qty: number; po_numbers: Set<string> }> = {};
 
       itemPoItems.forEach((poi: any) => {
-        const po = poi.purchase_order || poi.po;
-        const orderedQty = poi.ordered_qty || 0;
+        const po = poi.purchase_order;
+        const orderedQty = Number(poi.ordered_qty || 0);
         if (!po) return;
-
 
         if (!po.project_id || po.project_id === 0) {
           general_po_qty += orderedQty;
@@ -254,7 +357,7 @@ export class ReportService {
       const dispatched_site_breakdown: Array<{ project_id: number; project_name: string; project_code: string; qty: number }> = [];
 
       itemInvs.forEach((inv: any) => {
-        const qty = inv.quantity || 0;
+        const qty = Number(inv.quantity || 0);
         if (!inv.project_id || inv.project_id === 0) {
           central_warehouse_qty += qty;
         } else {
@@ -348,9 +451,22 @@ export class ReportService {
       total_dispatched_stock: filteredReports.reduce((acc, r) => acc + r.dispatched_site_qty, 0),
     };
 
+    const total = filteredReports.length;
+    let pageItems = filteredReports;
+
+    if (filters?.page && filters?.limit) {
+      const page = filters.page > 0 ? filters.page : 1;
+      const limit = filters.limit > 0 ? filters.limit : 15;
+      pageItems = filteredReports.slice((page - 1) * limit, page * limit);
+    }
+
     return {
       summary,
-      items: filteredReports,
+      items: pageItems,
+      total,
+      page: filters?.page || 1,
+      limit: filters?.limit || 15,
+      totalPages: filters?.limit ? Math.ceil(total / filters.limit) || 1 : 1,
     };
   }
 
@@ -358,9 +474,10 @@ export class ReportService {
    * Report 8: Project Financial Costing & Investment Report (How much money put into project)
    */
   public static async getProjectFinancialCostingReport(filters?: {
-
     project_id?: number;
     search?: string;
+    page?: number;
+    limit?: number;
   }) {
     const { Project, ProjectAssignment, ProjectAssignmentItem, ItemType, PurchaseOrderItem } = require('../models');
 
@@ -602,6 +719,15 @@ export class ReportService {
       }));
     }
 
+    const totalLedger = itemizedLedger.length;
+    let paginatedLedger = itemizedLedger;
+
+    if (filters?.page && filters?.limit) {
+      const page = filters.page > 0 ? filters.page : 1;
+      const limit = filters.limit > 0 ? filters.limit : 10;
+      paginatedLedger = itemizedLedger.slice((page - 1) * limit, page * limit);
+    }
+
     return {
       summary: {
         total_projects: mainProjects.length,
@@ -613,7 +739,11 @@ export class ReportService {
       },
       sub_projects_costing: finalSubProjectsCosting,
       category_costing: finalCategoryCosting,
-      itemized_ledger: itemizedLedger,
+      itemized_ledger: paginatedLedger,
+      total_ledger: totalLedger,
+      page: filters?.page || 1,
+      limit: filters?.limit || 10,
+      totalPages: filters?.limit ? Math.ceil(totalLedger / filters.limit) || 1 : 1,
       selected_project: mainProjects.length === 1 ? mainProjects[0] : null,
     };
   }

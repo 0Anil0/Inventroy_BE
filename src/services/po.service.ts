@@ -14,12 +14,26 @@ import { POApproverService } from './po-approver.service';
 
 export class POService {
   public static async getAll(
-    filters?: { project_id?: number; vendor_id?: number },
+    filters?: {
+      project_id?: number;
+      vendor_id?: number;
+      search?: string;
+      status?: string;
+      page?: number;
+      limit?: number;
+    },
     currentUser?: { userId: number; role: string }
   ) {
     const where: any = {};
-    if (filters?.project_id) where.project_id = filters.project_id;
+    if (filters?.project_id !== undefined && filters?.project_id !== null) {
+      if (filters.project_id === 0) {
+        where.project_id = null;
+      } else {
+        where.project_id = filters.project_id;
+      }
+    }
     if (filters?.vendor_id) where.vendor_id = filters.vendor_id;
+    if (filters?.status && filters.status !== 'ALL') where.status = filters.status;
 
     // Role-based visibility check:
     // If role is NOT ADMIN, strictly only show POs created by this user
@@ -27,7 +41,7 @@ export class POService {
       where.created_by_id = currentUser.userId;
     }
 
-    return await PurchaseOrder.findAll({
+    const poList = await PurchaseOrder.findAll({
       where,
       include: [
         { model: Vendor, as: 'vendor' },
@@ -44,6 +58,48 @@ export class POService {
       ],
       order: [['id', 'DESC']],
     });
+
+    let filtered = poList.map((po) => (po.toJSON ? po.toJSON() : po));
+
+    // Server-side search filter
+    if (filters?.search && filters.search.trim()) {
+      const q = filters.search.toLowerCase().trim();
+      filtered = filtered.filter((po: any) => {
+        const matchPoNo = (po.po_number || '').toLowerCase().includes(q);
+        const matchNotes = (po.notes || '').toLowerCase().includes(q);
+        const matchVendor =
+          (po.vendor?.name || '').toLowerCase().includes(q) ||
+          (po.vendor?.tax_id || '').toLowerCase().includes(q);
+        const matchProject =
+          (po.project?.name || '').toLowerCase().includes(q) ||
+          (po.project?.code || '').toLowerCase().includes(q);
+        const matchCreator = (po.created_by_user?.username || '').toLowerCase().includes(q);
+
+        const matchItems = (po.items || []).some(
+          (i: any) =>
+            (i.item_type?.name || '').toLowerCase().includes(q) ||
+            (i.item_type?.code || '').toLowerCase().includes(q) ||
+            (i.cat_no || i.item_type?.cat_no || '').toLowerCase().includes(q) ||
+            (i.make || i.item_type?.make || '').toLowerCase().includes(q)
+        );
+
+        return matchPoNo || matchNotes || matchVendor || matchProject || matchCreator || matchItems;
+      });
+    }
+
+    const total = filtered.length;
+
+    // Server-side pagination
+    let pageItems = filtered;
+    if (filters?.page && filters?.limit) {
+      const start = (filters.page - 1) * filters.limit;
+      pageItems = filtered.slice(start, start + filters.limit);
+    }
+
+    return {
+      purchaseOrders: pageItems,
+      total,
+    };
   }
 
   public static async getById(id: number) {
@@ -450,6 +506,8 @@ export class POService {
     project_id?: number;
     status?: string;
     search?: string;
+    page?: number;
+    limit?: number;
   }) {
     const whereItem: any = {};
     const wherePO: any = {};
@@ -467,33 +525,12 @@ export class POService {
       wherePO.status = params.status;
     }
 
-    if (params.search) {
-      const q = `%${params.search.trim()}%`;
-      whereItem[Op.or] = [
-        { cat_no: { [Op.iLike]: q } },
-        { make: { [Op.iLike]: q } },
-        { rating: { [Op.iLike]: q } },
-        { hsn_code: { [Op.iLike]: q } },
-      ];
-    }
-
     const items = await PurchaseOrderItem.findAll({
       where: whereItem,
       include: [
         {
           model: ItemType,
           as: 'item_type',
-          where: params.search
-            ? {
-                [Op.or]: [
-                  { name: { [Op.iLike]: `%${params.search.trim()}%` } },
-                  { code: { [Op.iLike]: `%${params.search.trim()}%` } },
-                  { cat_no: { [Op.iLike]: `%${params.search.trim()}%` } },
-                  { make: { [Op.iLike]: `%${params.search.trim()}%` } },
-                ],
-              }
-            : undefined,
-          required: false,
         },
         {
           model: PurchaseOrder,
@@ -509,11 +546,7 @@ export class POService {
       order: [['id', 'DESC']],
     });
 
-    let totalOrderedQty = 0;
-    let totalReceivedQty = 0;
-    let totalSpend = 0;
-
-    const formattedList = items.map((row) => {
+    let formattedList = items.map((row) => {
       const ordQty = Number(row.ordered_qty || 0);
       const recQty = Number(row.received_qty || 0);
       const price = Number(row.unit_price || 0);
@@ -523,10 +556,6 @@ export class POService {
       const netSub = ordQty * price * (1 - disc / 100);
       const lineTax = netSub * (gst / 100);
       const grandLine = netSub + lineTax;
-
-      totalOrderedQty += ordQty;
-      totalReceivedQty += recQty;
-      totalSpend += grandLine;
 
       return {
         id: row.id,
@@ -562,16 +591,53 @@ export class POService {
       };
     });
 
+    if (params.search && params.search.trim()) {
+      const q = params.search.trim().toLowerCase();
+      formattedList = formattedList.filter((item) => {
+        return (
+          item.po_number?.toLowerCase().includes(q) ||
+          item.vendor_name?.toLowerCase().includes(q) ||
+          item.project_name?.toLowerCase().includes(q) ||
+          item.item_code?.toLowerCase().includes(q) ||
+          item.item_name?.toLowerCase().includes(q) ||
+          item.cat_no?.toLowerCase().includes(q) ||
+          item.make?.toLowerCase().includes(q) ||
+          item.hsn_code?.toLowerCase().includes(q) ||
+          item.rating?.toLowerCase().includes(q)
+        );
+      });
+    }
+
+    let totalOrderedQty = 0;
+    let totalReceivedQty = 0;
+    let totalSpend = 0;
+
+    formattedList.forEach((row) => {
+      totalOrderedQty += row.ordered_qty;
+      totalReceivedQty += row.received_qty;
+      totalSpend += row.total_price;
+    });
+
+    const total = formattedList.length;
+    const page = params.page && params.page > 0 ? params.page : 1;
+    const limit = params.limit && params.limit > 0 ? params.limit : 20;
+    const totalPages = Math.ceil(total / limit) || 1;
+    const pageItems = formattedList.slice((page - 1) * limit, page * limit);
+
     return {
       success: true,
       summary: {
-        totalRecords: items.length,
+        totalRecords: total,
         totalOrderedQty,
         totalReceivedQty,
         totalPendingQty: Math.max(0, totalOrderedQty - totalReceivedQty),
         totalSpend,
       },
-      items: formattedList,
+      items: pageItems,
+      total,
+      page,
+      limit,
+      totalPages,
     };
   }
 }

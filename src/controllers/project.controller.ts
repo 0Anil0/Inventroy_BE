@@ -4,8 +4,13 @@ import { ProjectService } from '../services/project.service';
 export class ProjectController {
   public static async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const projects = await ProjectService.getAll();
-      res.json({ success: true, projects });
+      const search = req.query.search ? String(req.query.search) : undefined;
+      const category = req.query.category ? (String(req.query.category) as 'ALL' | 'MAIN' | 'SUB') : undefined;
+      const page = req.query.page ? parseInt(String(req.query.page), 10) : undefined;
+      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : undefined;
+
+      const result = await ProjectService.getAll({ search, category, page, limit });
+      res.json({ success: true, ...result });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }

@@ -4,14 +4,27 @@ import { PRService } from '../services/pr.service';
 export class PRController {
   public static async getAll(req: Request, res: Response, next: NextFunction) {
     try {
-      const { project_id, status, priority, search } = req.query;
-      const list = await PRService.getAll({
-        project_id: project_id ? Number(project_id) : undefined,
+      const { project_id, status, priority, search, page, limit } = req.query;
+      const result = await PRService.getAll({
+        project_id:
+          project_id !== undefined && project_id !== 'undefined' && project_id !== 'null'
+            ? Number(project_id)
+            : undefined,
         status: status as string,
         priority: priority as string,
         search: search as string,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
       });
-      res.json({ success: true, count: list.length, items: list });
+      res.json({
+        success: true,
+        count: result.total,
+        total: result.total,
+        pendingCount: result.pendingCount,
+        approvedCount: result.approvedCount,
+        convertedCount: result.convertedCount,
+        items: result.items,
+      });
     } catch (err) {
       next(err);
     }
