@@ -479,7 +479,7 @@ export class ReportService {
     page?: number;
     limit?: number;
   }) {
-    const { Project, ProjectAssignment, ProjectAssignmentItem, ItemType, PurchaseOrderItem } = require('../models');
+    const { Project, ProjectAssignment, ProjectAssignmentItem, ItemType, PurchaseOrderItem, InventoryLot } = require('../models');
 
     let targetProjectIds: number[] = [];
     let mainProjects: any[] = [];
@@ -498,27 +498,37 @@ export class ReportService {
       targetProjectIds = allProjects.map((p: any) => p.id);
     }
 
-    // Lookup latest Purchase Order unit price, discount %, and GST % for each item_type_id
+    // Lookup PO unit price, discount %, and GST % mapped specifically by PO ID + Item Type ID, as well as latest fallback
+    const poItemSpecificMap: Record<string, { base_unit_price: number; disc_percent: number; gst_percent: number; effective_unit_cost: number }> = {};
     const latestPoItemMap: Record<number, { base_unit_price: number; disc_percent: number; gst_percent: number; effective_unit_cost: number }> = {};
+
     try {
       const poItems = await PurchaseOrderItem.findAll({ order: [['id', 'DESC']] });
       poItems.forEach((poi: any) => {
-        if (!latestPoItemMap[poi.item_type_id]) {
-          const basePrice = Number(poi.unit_price) || 0;
-          const disc = Number(poi.discount_percent) || 0;
-          const gst = poi.gst_percent !== undefined ? Number(poi.gst_percent) : 18;
+        const basePrice = Number(poi.unit_price) || 0;
+        const disc = Number(poi.discount_percent) || 0;
+        const gst = poi.gst_percent !== undefined && poi.gst_percent !== null ? Number(poi.gst_percent) : 18;
 
-          const priceAfterDisc = basePrice - (basePrice * (disc / 100));
-          const effectiveUnitCost = Number((priceAfterDisc * (1 + gst / 100)).toFixed(2));
+        const priceAfterDisc = basePrice - (basePrice * (disc / 100));
+        const effectiveUnitCost = Number((priceAfterDisc * (1 + gst / 100)).toFixed(2));
 
-          if (basePrice > 0 || effectiveUnitCost > 0) {
-            latestPoItemMap[poi.item_type_id] = {
-              base_unit_price: basePrice,
-              disc_percent: disc,
-              gst_percent: gst,
-              effective_unit_cost: effectiveUnitCost,
-            };
-          }
+        const specKey = `${poi.po_id}_${poi.item_type_id}`;
+        if (!poItemSpecificMap[specKey] && (basePrice > 0 || effectiveUnitCost > 0)) {
+          poItemSpecificMap[specKey] = {
+            base_unit_price: basePrice,
+            disc_percent: disc,
+            gst_percent: gst,
+            effective_unit_cost: effectiveUnitCost,
+          };
+        }
+
+        if (!latestPoItemMap[poi.item_type_id] && (basePrice > 0 || effectiveUnitCost > 0)) {
+          latestPoItemMap[poi.item_type_id] = {
+            base_unit_price: basePrice,
+            disc_percent: disc,
+            gst_percent: gst,
+            effective_unit_cost: effectiveUnitCost,
+          };
         }
       });
     } catch (err) {
@@ -536,7 +546,10 @@ export class ReportService {
         {
           model: ProjectAssignmentItem,
           as: 'items',
-          include: [{ model: ItemType, as: 'item_type' }],
+          include: [
+            { model: ItemType, as: 'item_type' },
+            { model: InventoryLot, as: 'lot' },
+          ],
         },
         { model: Project, as: 'to_project', attributes: ['id', 'name', 'code', 'parent_id', 'location'] },
       ],
@@ -571,15 +584,25 @@ export class ReportService {
       (assignment.items || []).forEach((item: any) => {
         const qty = item.quantity || 0;
 
-        // Determine Effective Purchase Unit Cost (Incl GST)
+        // Determine Effective Purchase Unit Cost (Incl GST) for this specific lot/PO
         let baseUnitPrice = 0;
         let gstPercent = 0;
         let discPercent = 0;
         let unitCost = 0; // Net Landed Unit Cost (incl. GST)
 
-        if (item.unit_price !== undefined && item.unit_price !== null && Number(item.unit_price) > 0) {
+        const targetPoId = item.po_id || item.lot?.po_id;
+        const specKey = targetPoId ? `${targetPoId}_${item.item_type_id}` : '';
+        const specificPoInfo = specKey ? poItemSpecificMap[specKey] : null;
+
+        if (specificPoInfo) {
+          baseUnitPrice = item.unit_price && Number(item.unit_price) > 0 ? Number(item.unit_price) : specificPoInfo.base_unit_price;
+          gstPercent = specificPoInfo.gst_percent;
+          discPercent = specificPoInfo.disc_percent;
+          const priceAfterDisc = baseUnitPrice - (baseUnitPrice * (discPercent / 100));
+          unitCost = Number((priceAfterDisc * (1 + gstPercent / 100)).toFixed(2));
+        } else if (item.unit_price !== undefined && item.unit_price !== null && Number(item.unit_price) > 0) {
           baseUnitPrice = Number(item.unit_price);
-          if (item.po_id && latestPoItemMap[item.item_type_id]) {
+          if (latestPoItemMap[item.item_type_id]) {
             const poInfo = latestPoItemMap[item.item_type_id];
             gstPercent = poInfo.gst_percent;
             discPercent = poInfo.disc_percent;

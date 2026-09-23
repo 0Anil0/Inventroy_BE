@@ -215,10 +215,20 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
 
     const projectId = po.project_id || null;
 
-    // Generate unique GRN Number
+    // Generate guaranteed unique GRN Number
     const year = new Date().getFullYear();
-    const grnCount = await GoodsReceiptNote.count({ transaction });
-    const grn_number = `GRN-${year}-${String(grnCount + 1).padStart(4, '0')}`;
+    const maxGrn = await GoodsReceiptNote.findOne({
+      order: [['id', 'DESC']],
+      transaction,
+    });
+    let seq = (maxGrn?.id || 0) + 1;
+    let grn_number = `GRN-${year}-${String(seq).padStart(4, '0')}`;
+    let existingGrn = await GoodsReceiptNote.findOne({ where: { grn_number }, transaction });
+    while (existingGrn) {
+      seq++;
+      grn_number = `GRN-${year}-${String(seq).padStart(4, '0')}`;
+      existingGrn = await GoodsReceiptNote.findOne({ where: { grn_number }, transaction });
+    }
 
     const userId = (req as any).user?.userId || (req as any).user?.id || null;
 
@@ -238,11 +248,13 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
     );
 
     let totalReceivedInThisGRN = 0;
+    let itemSeq = 0;
 
     for (const itemData of items) {
       const receivedQtyNow = Number(itemData.received_qty || 0);
       if (receivedQtyNow <= 0) continue;
 
+      itemSeq++;
       totalReceivedInThisGRN += receivedQtyNow;
       const shelfId = itemData.shelf_id ? Number(itemData.shelf_id) : null;
       const rackId = itemData.rack_id ? Number(itemData.rack_id) : null;
@@ -293,7 +305,7 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
           assigned_qty: 0,
           shelf_id: shelfId,
           rack_id: rackId,
-          lot_number: `${po.po_number || 'PO'}-${grn_number}`,
+          lot_number: `${po.po_number || 'PO'}-${grn_number}-I${itemData.item_type_id}-${itemSeq}`,
         },
         { transaction }
       );
@@ -359,7 +371,7 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
           quantity: receivedQtyNow,
           previous_quantity: prevQty,
           new_quantity: newQty,
-          notes: `Stock Inward via GRN: ${grn_number} (PO: ${po.po_number})${targetProjectId ? ` | Project #${targetProjectId}` : ' | General Stock'}${challan_no ? ` | Inv: ${challan_no}` : ''}${locationNote}`,
+          notes: `Stock Inward via GRN: ${grn_number} (PO: ${po.po_number})${targetProjectId ? ` | Project #${targetProjectId}` : ' | General Stock'}${challan_no ? ` | Inv: ${challan_no}` : ''}${locationNote}`.slice(0, 250),
         },
         { transaction }
       );
@@ -433,6 +445,7 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
   } catch (error: any) {
     await transaction.rollback();
     console.error('Error creating GRN:', error);
-    res.status(500).json({ message: 'Error creating Goods Receipt Note', error: error.message });
+    const detailError = error.errors ? error.errors.map((e: any) => `${e.path}: ${e.message}`).join('; ') : error.message;
+    res.status(500).json({ message: 'Error creating Goods Receipt Note', error: detailError || error.message });
   }
 };
