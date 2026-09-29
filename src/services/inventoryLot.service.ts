@@ -23,12 +23,17 @@ export class InventoryLotService {
     }
 
     if (project_id) {
-      // Find target project and all its child sub-projects
+      const targetProj = await Project.findByPk(project_id);
+      const parentId = targetProj?.parent_id ? targetProj.parent_id : project_id;
+
+      // Find parent project and all its child sub-projects
       const childProjects = await Project.findAll({
-        where: { parent_id: project_id },
+        where: { parent_id: parentId },
         attributes: ['id'],
       });
-      const validProjectIds = [project_id, ...childProjects.map((p) => p.id)];
+      const validProjectIds = Array.from(
+        new Set([project_id, parentId, ...childProjects.map((p) => p.id)])
+      );
 
       whereClause[Op.or] = [
         { project_id: null },
