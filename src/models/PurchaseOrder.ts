@@ -11,6 +11,7 @@ export interface PurchaseOrderAttributes {
   id: number;
   po_number: string;
   vendor_id: number;
+  plant_id: number;
   project_id?: number | null;
   terms_and_conditions_id?: number | null;
   created_by_id?: number | null;
@@ -54,6 +55,7 @@ export class PurchaseOrder
   declare public id: number;
   declare public po_number: string;
   declare public vendor_id: number;
+  declare public plant_id: number;
   declare public project_id: number | null;
   declare public terms_and_conditions_id: number | null;
   declare public created_by_id: number | null;
@@ -97,6 +99,14 @@ PurchaseOrder.init(
       allowNull: false,
       references: {
         model: 'vendors',
+        key: 'id',
+      },
+    },
+    plant_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'plants',
         key: 'id',
       },
     },

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { PRService } from '../services/pr.service';
+import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
 export class PRController {
   public static async getAll(req: Request, res: Response, next: NextFunction) {
@@ -15,6 +16,7 @@ export class PRController {
         search: search as string,
         page: page ? Number(page) : undefined,
         limit: limit ? Number(limit) : undefined,
+        plant_id: (req as AuthenticatedRequest).plantId,
       });
       res.json({
         success: true,
@@ -42,8 +44,16 @@ export class PRController {
 
   public static async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const userId = (req as any).user?.id || (req as any).user?.userId;
-      const pr = await PRService.create(req.body, userId);
+      const authReq = req as AuthenticatedRequest;
+      const userId = authReq.user?.userId;
+      const plant_id = authReq.plantId;
+
+      if (!plant_id) {
+        res.status(400).json({ success: false, message: 'Plant selection is required' });
+        return;
+      }
+
+      const pr = await PRService.create({ ...req.body, plant_id }, userId);
       res.status(201).json({ success: true, message: 'Purchase Requisition created successfully', requisition: pr });
     } catch (err) {
       next(err);

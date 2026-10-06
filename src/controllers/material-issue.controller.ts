@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { MaterialIssueService } from '../services/material-issue.service';
+import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
 export class MaterialIssueController {
   public static async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -7,6 +8,7 @@ export class MaterialIssueController {
       const { project_id } = req.query;
       const issues = await MaterialIssueService.getAll({
         project_id: project_id ? parseInt(String(project_id), 10) : undefined,
+        plant_id: (req as AuthenticatedRequest).plantId,
       });
       res.json({ success: true, issues });
     } catch (error: any) {
@@ -37,12 +39,19 @@ export class MaterialIssueController {
         return;
       }
 
+      const plant_id = (req as AuthenticatedRequest).plantId;
+      if (!plant_id) {
+        res.status(400).json({ success: false, message: 'Plant selection is required' });
+        return;
+      }
+
       const issue = await MaterialIssueService.create({
         project_id: parseInt(String(project_id), 10),
         issued_to,
         issued_by_user_id: userId,
         notes,
         items,
+        plant_id,
       });
 
       res.status(201).json({ success: true, issue });

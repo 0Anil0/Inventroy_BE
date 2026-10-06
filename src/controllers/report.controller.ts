@@ -6,6 +6,7 @@ export class ReportController {
     try {
       const { project_id, health, search, page, limit } = req.query;
       const data = await ReportService.getStockSummaryReport({
+        plant_id: (req as any).plantId,
         project_id: project_id ? parseInt(String(project_id), 10) : undefined,
         health: health ? String(health) as any : undefined,
         search: search ? String(search) : undefined,
@@ -22,6 +23,7 @@ export class ReportController {
     try {
       const { vendor_id, status, startDate, endDate, search, page, limit } = req.query;
       const data = await ReportService.getPurchaseOrdersReport({
+        plant_id: (req as any).plantId,
         vendor_id: vendor_id ? parseInt(String(vendor_id), 10) : undefined,
         status: status ? String(status) : undefined,
         startDate: startDate ? String(startDate) : undefined,
@@ -40,6 +42,7 @@ export class ReportController {
     try {
       const { project_id, recipient, startDate, endDate } = req.query;
       const data = await ReportService.getMaterialIssuesReport({
+        plant_id: (req as any).plantId,
         project_id: project_id ? parseInt(String(project_id), 10) : undefined,
         recipient: recipient ? String(recipient) : undefined,
         startDate: startDate ? String(startDate) : undefined,
@@ -55,6 +58,7 @@ export class ReportController {
     try {
       const { project_id, startDate, endDate } = req.query;
       const data = await ReportService.getStockTransfersReport({
+        plant_id: (req as any).plantId,
         project_id: project_id ? parseInt(String(project_id), 10) : undefined,
         startDate: startDate ? String(startDate) : undefined,
         endDate: endDate ? String(endDate) : undefined,
@@ -69,6 +73,7 @@ export class ReportController {
     try {
       const { project_id, item_type_id, type, startDate, endDate, search, page, limit } = req.query;
       const data = await ReportService.getAuditLedgerReport({
+        plant_id: (req as any).plantId,
         project_id: project_id ? parseInt(String(project_id), 10) : undefined,
         item_type_id: item_type_id ? parseInt(String(item_type_id), 10) : undefined,
         type: type ? String(type) : undefined,
@@ -88,6 +93,7 @@ export class ReportController {
     try {
       const { project_id, search, health, page, limit } = req.query;
       const data = await ReportService.getProcurementDistributionReport({
+        plant_id: (req as any).plantId,
         project_id: project_id ? parseInt(String(project_id), 10) : undefined,
         search: search ? String(search) : undefined,
         health: health ? String(health) as any : undefined,
@@ -104,6 +110,7 @@ export class ReportController {
     try {
       const { project_id, search, page, limit } = req.query;
       const data = await ReportService.getProjectFinancialCostingReport({
+        plant_id: (req as any).plantId,
         project_id: project_id ? parseInt(String(project_id), 10) : undefined,
         search: search ? String(search) : undefined,
         page: page ? parseInt(String(page), 10) : undefined,

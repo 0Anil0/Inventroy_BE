@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { User, Role } from '../models';
+import { User, Role, Plant } from '../models';
 import { generateToken } from '../utils/auth.utils';
 
 export class AuthService {
@@ -11,7 +11,10 @@ export class AuthService {
   public static async login(username: string, passwordPayload: string) {
     const user = await User.findOne({
       where: { username },
-      include: [{ model: Role, as: 'role', attributes: ['id', 'name', 'description'] }],
+      include: [
+        { model: Role, as: 'role', attributes: ['id', 'name', 'description'] },
+        { model: Plant, as: 'plants', attributes: ['id', 'name', 'code', 'status'], through: { attributes: [] } }
+      ],
     });
 
     if (!user) {
@@ -39,6 +42,7 @@ export class AuthService {
         email: user.email,
         role: roleName,
         role_id: user.role_id,
+        plants: (user as any).plants || [],
         createdAt: user.createdAt,
       },
     };
@@ -87,7 +91,10 @@ export class AuthService {
   public static async getUserById(userId: number) {
     const user = await User.findByPk(userId, {
       attributes: ['id', 'username', 'email', 'role_id', 'createdAt'],
-      include: [{ model: Role, as: 'role', attributes: ['id', 'name', 'description'] }],
+      include: [
+        { model: Role, as: 'role', attributes: ['id', 'name', 'description'] },
+        { model: Plant, as: 'plants', attributes: ['id', 'name', 'code', 'status'], through: { attributes: [] } }
+      ],
     });
 
     if (!user) {
@@ -100,6 +107,7 @@ export class AuthService {
       email: user.email,
       role: user.role ? user.role.name : 'user',
       role_id: user.role_id,
+      plants: (user as any).plants || [],
       createdAt: user.createdAt,
     };
   }

@@ -66,7 +66,7 @@ export class UserController {
 
   public static async createUser(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { username, email, password, role_id } = req.body;
+      const { username, email, password, role_id, plantIds } = req.body;
 
       if (!username || !password || !role_id) {
         res.status(400).json({ success: false, message: 'Username, password, and role are required' });
@@ -78,6 +78,7 @@ export class UserController {
         email,
         passwordPayload: password,
         role_id: parseInt(String(role_id), 10),
+        plantIds: plantIds ? (Array.isArray(plantIds) ? plantIds.map(Number) : [Number(plantIds)]) : undefined,
       });
 
       res.status(201).json({ success: true, user });
@@ -90,13 +91,14 @@ export class UserController {
     try {
       const idParam = String(req.params.id);
       const id = parseInt(idParam, 10);
-      const { username, email, password, role_id } = req.body;
+      const { username, email, password, role_id, plantIds } = req.body;
 
       const user = await UserService.updateUser(id, {
         username,
         email,
         passwordPayload: password,
         role_id: role_id ? parseInt(String(role_id), 10) : undefined,
+        plantIds: plantIds !== undefined ? (Array.isArray(plantIds) ? plantIds.map(Number) : [Number(plantIds)]) : undefined,
       });
 
       res.json({ success: true, user });

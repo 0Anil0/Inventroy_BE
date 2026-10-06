@@ -17,6 +17,7 @@ export class PRService {
     search?: string;
     page?: number;
     limit?: number;
+    plant_id?: number;
   }) {
     const where: any = {};
     if (filters?.project_id !== undefined && filters?.project_id !== null) {
@@ -28,6 +29,7 @@ export class PRService {
     }
     if (filters?.status && filters.status !== 'ALL') where.status = filters.status;
     if (filters?.priority && filters.priority !== 'ALL') where.priority = filters.priority;
+    if (filters?.plant_id) where.plant_id = filters.plant_id;
 
     const prList = await PurchaseRequisition.findAll({
       where,
@@ -122,7 +124,7 @@ export class PRService {
       (pr.items || []).map(async (item) => {
         let centralStock = 0;
         const centralInv = await ProjectInventory.findOne({
-          where: { project_id: null, item_type_id: item.item_type_id },
+          where: { project_id: null, item_type_id: item.item_type_id, plant_id: pr.plant_id },
         });
         if (centralInv) {
           centralStock = centralInv.quantity;
@@ -131,7 +133,7 @@ export class PRService {
         let projectStock = 0;
         if (pr.project_id) {
           const projInv = await ProjectInventory.findOne({
-            where: { project_id: pr.project_id, item_type_id: item.item_type_id },
+            where: { project_id: pr.project_id, item_type_id: item.item_type_id, plant_id: pr.plant_id },
           });
           if (projInv) projectStock = projInv.quantity;
         }
@@ -165,6 +167,7 @@ export class PRService {
         estimated_unit_price?: number;
         notes?: string;
       }>;
+      plant_id: number;
     },
     requestedById?: number
   ) {
@@ -182,6 +185,7 @@ export class PRService {
 
     const pr = await PurchaseRequisition.create({
       pr_number: prNumber,
+      plant_id: data.plant_id,
       project_id: data.project_id || null,
       requested_by_id: requestedById || null,
       created_by_id: requestedById || null,
@@ -299,6 +303,7 @@ export class PRService {
     const po = await POService.create(
       {
         vendor_id: poData.vendor_id,
+        plant_id: pr.plant_id,
         project_id: pr.project_id || undefined,
         terms_and_conditions_id: poData.terms_and_conditions_id,
         order_date: poData.order_date,
@@ -361,6 +366,7 @@ export class PRService {
         const pr = await this.create({
           pr_number: 'PR/26-27/001',
           priority: 'HIGH',
+          plant_id: 1,
           required_date: '2026-09-30',
           notes: 'Urgent site procurement requisition for upcoming substation installation project',
           items: prItems,

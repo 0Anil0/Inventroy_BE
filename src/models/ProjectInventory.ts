@@ -7,6 +7,7 @@ import { StorageRack } from './StorageRack';
 
 export interface ProjectInventoryAttributes {
   id: number;
+  plant_id: number;
   project_id?: number | null;
   item_type_id: number;
   shelf_id?: number | null;
@@ -25,6 +26,7 @@ export class ProjectInventory
   implements ProjectInventoryAttributes
 {
   declare public id: number;
+  declare public plant_id: number;
   declare public project_id: number | null;
   declare public item_type_id: number;
   declare public shelf_id: number | null;
@@ -53,6 +55,14 @@ ProjectInventory.init(
       allowNull: true,
       references: {
         model: 'projects',
+        key: 'id',
+      },
+    },
+    plant_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'plants',
         key: 'id',
       },
     },

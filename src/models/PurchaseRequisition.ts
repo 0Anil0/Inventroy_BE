@@ -17,6 +17,7 @@ export type PRPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 export interface PurchaseRequisitionAttributes {
   id: number;
   pr_number: string;
+  plant_id: number;
   project_id?: number | null;
   requested_by_id?: number | null;
   created_by_id?: number | null;
@@ -60,6 +61,7 @@ export class PurchaseRequisition
 {
   declare public id: number;
   declare public pr_number: string;
+  declare public plant_id: number;
   declare public project_id: number | null;
   declare public requested_by_id: number | null;
   declare public created_by_id: number | null;
@@ -97,6 +99,14 @@ PurchaseRequisition.init(
       type: DataTypes.STRING(50),
       allowNull: false,
       unique: true,
+    },
+    plant_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'plants',
+        key: 'id',
+      },
     },
     project_id: {
       type: DataTypes.INTEGER,

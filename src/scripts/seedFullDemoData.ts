@@ -131,6 +131,7 @@ export const seedFullDemoData = async () => {
         defaults: {
           project_id: p.id,
           item_type_id: it.id,
+          plant_id: 1,
           quantity: qty,
           min_quantity: minQty,
         },
@@ -153,6 +154,7 @@ export const seedFullDemoData = async () => {
       defaults: {
         po_number: poNum,
         vendor_id: vendor.id,
+        plant_id: 1,
         status: status as any,
         total_amount: (i + 1) * 35000,
         order_date: new Date(poDates[i]),
@@ -210,6 +212,7 @@ export const seedFullDemoData = async () => {
       defaults: {
         issue_number: issueNum,
         project_id: project.id,
+        plant_id: 1,
         issued_to: recipients[i],
         issued_by_user_id: adminId,
         issue_date: new Date(poDates[i]),
@@ -253,6 +256,7 @@ export const seedFullDemoData = async () => {
     await StockMovement.create({
       project_id: project.id,
       item_type_id: item.id,
+      plant_id: 1,
       user_id: adminId,
       type,
       quantity: qty,

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { InventoryService } from '../services/inventory.service';
+import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
 export class InventoryController {
   public static async clearTransactionalData(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -13,7 +14,12 @@ export class InventoryController {
 
   public static async getAllInventory(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const inventory = await InventoryService.getAllInventory();
+      const plant_id = (req as AuthenticatedRequest).plantId;
+      if (!plant_id) {
+        res.status(400).json({ success: false, message: 'Plant selection is required' });
+        return;
+      }
+      const inventory = await InventoryService.getAllInventory(plant_id);
       res.json({ success: true, inventory });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -38,6 +44,12 @@ export class InventoryController {
       const page = req.query.page ? parseInt(String(req.query.page), 10) : undefined;
       const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : undefined;
 
+      const plant_id = (req as AuthenticatedRequest).plantId;
+      if (!plant_id) {
+        res.status(400).json({ success: false, message: 'Plant selection is required' });
+        return;
+      }
+
       const result = await InventoryService.getByProjectId({
         projectId,
         search,
@@ -46,6 +58,7 @@ export class InventoryController {
         endDate,
         page,
         limit,
+        plant_id,
       });
 
       res.json({
@@ -83,6 +96,12 @@ export class InventoryController {
         });
         return;
       }
+      
+      const plant_id = (req as AuthenticatedRequest).plantId;
+      if (!plant_id) {
+        res.status(400).json({ success: false, message: 'Plant selection is required' });
+        return;
+      }
 
       const updatedRecord = await InventoryService.adjustQuantity({
         project_id: parseInt(String(project_id), 10),
@@ -96,6 +115,7 @@ export class InventoryController {
         adjustment_type,
         user_id: userId,
         notes,
+        plant_id,
       });
 
       res.json({ success: true, inventoryItem: updatedRecord });
@@ -117,6 +137,12 @@ export class InventoryController {
         return;
       }
 
+      const plant_id = (req as AuthenticatedRequest).plantId;
+      if (!plant_id) {
+        res.status(400).json({ success: false, message: 'Plant selection is required' });
+        return;
+      }
+
       const inventoryItems = await InventoryService.batchAdjustQuantity({
         project_id: parseInt(String(project_id), 10),
         items: items.map((i: any) => ({
@@ -130,6 +156,7 @@ export class InventoryController {
         })),
         user_id: userId,
         notes,
+        plant_id,
       });
 
       res.json({ success: true, inventoryItems });
@@ -158,6 +185,12 @@ export class InventoryController {
         return;
       }
 
+      const plant_id = (req as AuthenticatedRequest).plantId;
+      if (!plant_id) {
+        res.status(400).json({ success: false, message: 'Plant selection is required' });
+        return;
+      }
+
       const result = await InventoryService.transferStock({
         from_project_id: parseInt(String(from_project_id), 10),
         to_project_id: parseInt(String(to_project_id), 10),
@@ -166,6 +199,7 @@ export class InventoryController {
         lot_id: lot_id ? parseInt(String(lot_id), 10) : undefined,
         user_id: userId,
         notes,
+        plant_id,
       });
 
       res.json({

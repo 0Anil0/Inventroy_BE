@@ -5,8 +5,12 @@ export class InventoryService {
   /**
    * Fetches all inventory records across all projects and general store warehouse
    */
-  public static async getAllInventory() {
+  public static async getAllInventory(plant_id?: number) {
+    const where: any = {};
+    if (plant_id) where.plant_id = plant_id;
+
     return await ProjectInventory.findAll({
+      where,
       include: [
         {
           model: Project,
@@ -39,8 +43,9 @@ export class InventoryService {
     endDate?: string;
     page?: number;
     limit?: number;
+    plant_id?: number;
   }) {
-    const { projectId, search, filterMode, startDate, endDate, page, limit } = params;
+    const { projectId, search, filterMode, startDate, endDate, page, limit, plant_id } = params;
 
     // 1. Fetch all master catalog items
     const allItemTypes = await ItemType.findAll({
@@ -70,6 +75,10 @@ export class InventoryService {
       } else {
         whereClause.project_id = { [Op.in]: targetProjectIds.filter((id) => id !== null) };
       }
+    }
+    
+    if (plant_id) {
+      whereClause.plant_id = plant_id;
     }
 
     const existingInventories = await ProjectInventory.findAll({
@@ -206,6 +215,7 @@ export class InventoryService {
     adjustment_type?: 'ADD' | 'REMOVE' | 'SET';
     user_id?: number;
     notes?: string;
+    plant_id: number;
   }) {
     const {
       project_id,
@@ -219,7 +229,10 @@ export class InventoryService {
       adjustment_type,
       user_id,
       notes,
+      plant_id,
     } = data;
+
+    if (!plant_id) throw new Error('Plant selection is required');
 
     const targetProjectId = (project_id && project_id !== 0) ? project_id : null;
     let projectName = 'General Stock / Main Store';
@@ -234,10 +247,11 @@ export class InventoryService {
     if (!itemType) throw new Error('Item type not found');
 
     const [record] = await ProjectInventory.findOrCreate({
-      where: { project_id: targetProjectId, item_type_id },
+      where: { project_id: targetProjectId, item_type_id, plant_id },
       defaults: {
         project_id: targetProjectId,
         item_type_id,
+        plant_id,
         quantity: 0,
         min_quantity: min_quantity !== undefined ? min_quantity : 0,
         shelf_id: shelf_id || null,
@@ -299,6 +313,7 @@ export class InventoryService {
       await StockMovement.create({
         project_id: targetProjectId,
         item_type_id,
+        plant_id,
         user_id: user_id || null,
         type: movementType,
         quantity: Math.abs(diff),
@@ -343,8 +358,11 @@ export class InventoryService {
     }>;
     user_id?: number;
     notes?: string;
+    plant_id: number;
   }) {
-    const { project_id, items, user_id, notes } = data;
+    const { project_id, items, user_id, notes, plant_id } = data;
+
+    if (!plant_id) throw new Error('Plant selection is required');
 
     const targetProjectId = (project_id && project_id !== 0) ? project_id : null;
     if (targetProjectId) {
@@ -367,6 +385,7 @@ export class InventoryService {
         adjustment_type: 'SET',
         user_id,
         notes: notes || 'Batch item opening stock entry',
+        plant_id,
       });
       if (updated) results.push(updated);
     }
@@ -385,8 +404,11 @@ export class InventoryService {
     lot_id?: number;
     user_id?: number;
     notes?: string;
+    plant_id: number;
   }) {
-    const { from_project_id, to_project_id, item_type_id, quantity, lot_id, user_id, notes } = data;
+    const { from_project_id, to_project_id, item_type_id, quantity, lot_id, user_id, notes, plant_id } = data;
+
+    if (!plant_id) throw new Error('Plant selection is required');
 
     const fromTargetId = (from_project_id && from_project_id !== 0) ? from_project_id : null;
     const toTargetId = (to_project_id && to_project_id !== 0) ? to_project_id : null;
@@ -400,7 +422,7 @@ export class InventoryService {
     }
 
     const sourceInventory = await ProjectInventory.findOne({
-      where: { project_id: fromTargetId, item_type_id },
+      where: { project_id: fromTargetId, item_type_id, plant_id },
       include: [{ model: ItemType, as: 'item_type' }],
     });
 
@@ -476,6 +498,7 @@ export class InventoryService {
     await StockMovement.create({
       project_id: fromTargetId,
       item_type_id,
+      plant_id,
       user_id: user_id || null,
       type: 'TRANSFER',
       quantity,
@@ -486,10 +509,11 @@ export class InventoryService {
 
     // Add to Destination Location Inventory
     const [destInventory] = await ProjectInventory.findOrCreate({
-      where: { project_id: toTargetId, item_type_id },
+      where: { project_id: toTargetId, item_type_id, plant_id },
       defaults: {
         project_id: toTargetId,
         item_type_id,
+        plant_id,
         quantity: 0,
         min_quantity: 0,
       },
@@ -502,6 +526,7 @@ export class InventoryService {
     await StockMovement.create({
       project_id: toTargetId,
       item_type_id,
+      plant_id,
       user_id: user_id || null,
       type: 'TRANSFER',
       quantity,
@@ -536,12 +561,14 @@ export class InventoryService {
     project_id?: number;
     item_type_id?: number;
     limit?: number;
+    plant_id?: number;
   }) {
     const where: any = {};
     if (filters?.project_id !== undefined && filters?.project_id !== null) {
       where.project_id = (filters.project_id === 0 ? null : filters.project_id);
     }
     if (filters?.item_type_id) where.item_type_id = filters.item_type_id;
+    if (filters?.plant_id) where.plant_id = filters.plant_id;
 
     return await StockMovement.findAll({
       where,
@@ -558,11 +585,15 @@ export class InventoryService {
   /**
    * Generates Executive Dashboard Analytics
    */
-  public static async getDashboardStats() {
+  public static async getDashboardStats(plant_id?: number) {
     const totalProjects = await Project.count();
     const totalItemTypes = await ItemType.count();
+    
+    const inventoryWhere: any = {};
+    if (plant_id) inventoryWhere.plant_id = plant_id;
 
     const allInventory = await ProjectInventory.findAll({
+      where: inventoryWhere,
       include: [
         { model: Project, as: 'project', attributes: ['id', 'name', 'code'] },
         { model: ItemType, as: 'item_type', attributes: ['id', 'name', 'code', 'unit'] },
@@ -575,7 +606,7 @@ export class InventoryService {
       (item) => item.quantity > 0 && item.quantity <= (item.min_quantity || 10)
     );
 
-    const recentMovements = await this.getStockMovements({ limit: 10 });
+    const recentMovements = await this.getStockMovements({ limit: 10, plant_id });
 
     // Project breakdown
     const projects = await Project.findAll();

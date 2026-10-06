@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ProjectAssignmentService } from '../services/projectAssignment.service';
+import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
 export class ProjectAssignmentController {
   public static async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -14,6 +15,12 @@ export class ProjectAssignmentController {
       const page = req.query.page ? parseInt(String(req.query.page), 10) : undefined;
       const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : undefined;
 
+      const plant_id = (req as AuthenticatedRequest).plantId;
+      if (!plant_id) {
+        res.status(400).json({ success: false, message: 'Plant selection is required' });
+        return;
+      }
+
       const result = await ProjectAssignmentService.getAll({
         search,
         to_project_id,
@@ -21,6 +28,7 @@ export class ProjectAssignmentController {
         to_date,
         page,
         limit,
+        plant_id,
       });
 
       res.json({
@@ -63,6 +71,12 @@ export class ProjectAssignmentController {
         return;
       }
 
+      const plant_id = (req as AuthenticatedRequest).plantId;
+      if (!plant_id) {
+        res.status(400).json({ success: false, message: 'Plant selection is required' });
+        return;
+      }
+
       const assignment = await ProjectAssignmentService.create({
         from_project_id,
         to_project_id: parseInt(String(to_project_id), 10),
@@ -74,6 +88,7 @@ export class ProjectAssignmentController {
           lot_id: i.lot_id ? parseInt(String(i.lot_id), 10) : undefined,
           quantity: parseFloat(String(i.quantity)),
         })),
+        plant_id,
       });
 
       res.status(201).json({
@@ -89,7 +104,12 @@ export class ProjectAssignmentController {
   public static async update(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = parseInt(String(req.params.id), 10);
-      const assignment = await ProjectAssignmentService.update(id, req.body);
+      const plant_id = (req as AuthenticatedRequest).plantId;
+      if (!plant_id) {
+        res.status(400).json({ success: false, message: 'Plant selection is required' });
+        return;
+      }
+      const assignment = await ProjectAssignmentService.update(id, { ...req.body, plant_id });
       res.json({
         success: true,
         message: `Assignment ${assignment?.assignment_no} updated successfully`,
@@ -103,7 +123,12 @@ export class ProjectAssignmentController {
   public static async delete(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = parseInt(String(req.params.id), 10);
-      const result = await ProjectAssignmentService.delete(id);
+      const plant_id = (req as AuthenticatedRequest).plantId;
+      if (!plant_id) {
+        res.status(400).json({ success: false, message: 'Plant selection is required' });
+        return;
+      }
+      const result = await ProjectAssignmentService.delete(id, plant_id);
       res.json(result);
     } catch (error: any) {
       res.status(400).json({ success: false, message: error.message });

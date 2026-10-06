@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { Op } from 'sequelize';
-import { User, Role } from '../models';
+import { User, Role, Plant } from '../models';
 import { AuthService } from './auth.service';
 
 export interface UserQueryParams {
@@ -53,6 +53,12 @@ export class UserService {
           model: Role,
           as: 'role',
           attributes: ['id', 'name', 'description'],
+        },
+        {
+          model: Plant,
+          as: 'plants',
+          attributes: ['id', 'name', 'code'],
+          through: { attributes: [] },
         },
       ],
       order: [['id', 'DESC']],
@@ -154,6 +160,7 @@ export class UserService {
     email?: string;
     passwordPayload: string;
     role_id: number;
+    plantIds?: number[];
   }) {
     const existingUser = await User.findOne({ where: { username: data.username } });
     if (existingUser) {
@@ -176,9 +183,16 @@ export class UserService {
       role_id: data.role_id,
     });
 
+    if (data.plantIds && data.plantIds.length > 0) {
+      await (newUser as any).setPlants(data.plantIds);
+    }
+
     return await User.findByPk(newUser.id, {
       attributes: ['id', 'username', 'email', 'role_id', 'createdAt'],
-      include: [{ model: Role, as: 'role', attributes: ['id', 'name', 'description'] }],
+      include: [
+        { model: Role, as: 'role', attributes: ['id', 'name', 'description'] },
+        { model: Plant, as: 'plants', attributes: ['id', 'name', 'code'], through: { attributes: [] } }
+      ],
     });
   }
 
@@ -192,6 +206,7 @@ export class UserService {
       email?: string;
       role_id?: number;
       passwordPayload?: string;
+      plantIds?: number[];
     }
   ) {
     const user = await User.findByPk(id);
@@ -220,9 +235,16 @@ export class UserService {
 
     await user.update(updateFields);
 
+    if (data.plantIds !== undefined) {
+      await (user as any).setPlants(data.plantIds);
+    }
+
     return await User.findByPk(id, {
       attributes: ['id', 'username', 'email', 'role_id', 'createdAt'],
-      include: [{ model: Role, as: 'role', attributes: ['id', 'name', 'description'] }],
+      include: [
+        { model: Role, as: 'role', attributes: ['id', 'name', 'description'] },
+        { model: Plant, as: 'plants', attributes: ['id', 'name', 'code'], through: { attributes: [] } }
+      ],
     });
   }
 

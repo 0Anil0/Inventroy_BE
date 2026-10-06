@@ -1,8 +1,9 @@
 import { StorageShelf, StorageRack } from '../models';
 
 export class StorageLocationService {
-  public static async getAllShelves() {
+  public static async getAllShelves(plantId: number) {
     return await StorageShelf.findAll({
+      where: { plant_id: plantId },
       include: [
         {
           model: StorageRack,
@@ -16,10 +17,10 @@ export class StorageLocationService {
     });
   }
 
-  public static async createShelf(data: { code: string; name: string; zone?: string; description?: string }) {
-    const existing = await StorageShelf.findOne({ where: { code: data.code } });
+  public static async createShelf(data: { code: string; name: string; zone?: string; description?: string; plant_id: number }) {
+    const existing = await StorageShelf.findOne({ where: { code: data.code, plant_id: data.plant_id } });
     if (existing) {
-      throw new Error(`Shelf with code '${data.code}' already exists`);
+      throw new Error(`Shelf with code '${data.code}' already exists in this plant`);
     }
 
     return await StorageShelf.create({
@@ -27,6 +28,7 @@ export class StorageLocationService {
       name: data.name,
       zone: data.zone || null,
       description: data.description || null,
+      plant_id: data.plant_id,
     });
   }
 
@@ -38,8 +40,8 @@ export class StorageLocationService {
     if (!shelf) throw new Error('Shelf not found');
 
     if (data.code && data.code !== shelf.code) {
-      const existing = await StorageShelf.findOne({ where: { code: data.code } });
-      if (existing) throw new Error(`Shelf with code '${data.code}' already exists`);
+      const existing = await StorageShelf.findOne({ where: { code: data.code, plant_id: shelf.plant_id } });
+      if (existing) throw new Error(`Shelf with code '${data.code}' already exists in this plant`);
     }
 
     await shelf.update({

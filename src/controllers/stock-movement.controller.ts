@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { InventoryService } from '../services/inventory.service';
+import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 
 export class StockMovementController {
   public static async getMovements(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -10,6 +11,7 @@ export class StockMovementController {
         project_id: project_id ? parseInt(String(project_id), 10) : undefined,
         item_type_id: item_type_id ? parseInt(String(item_type_id), 10) : undefined,
         limit: limit ? parseInt(String(limit), 10) : 50,
+        plant_id: (req as AuthenticatedRequest).plantId,
       });
 
       res.json({ success: true, movements });

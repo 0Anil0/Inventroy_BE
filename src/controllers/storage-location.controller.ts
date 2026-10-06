@@ -4,7 +4,8 @@ import { StorageLocationService } from '../services/storage-location.service';
 export class StorageLocationController {
   public static async getAllShelves(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const shelves = await StorageLocationService.getAllShelves();
+      const plantId = (req as any).plantId || 1;
+      const shelves = await StorageLocationService.getAllShelves(plantId);
       res.json({ success: true, shelves });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
@@ -13,13 +14,14 @@ export class StorageLocationController {
 
   public static async createShelf(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
+      const plantId = (req as any).plantId || 1;
       const { code, name, zone, description } = req.body;
       if (!code || !name) {
         res.status(400).json({ success: false, message: 'Shelf code and name are required' });
         return;
       }
 
-      const shelf = await StorageLocationService.createShelf({ code, name, zone, description });
+      const shelf = await StorageLocationService.createShelf({ code, name, zone, description, plant_id: plantId });
       res.status(201).json({ success: true, shelf });
     } catch (error: any) {
       res.status(400).json({ success: false, message: error.message });

@@ -9,6 +9,7 @@ export interface ProjectAssignmentAttributes {
   assignment_no: string;
   from_project_id?: number | null;
   to_project_id: number;
+  plant_id: number;
   assigned_to_person: string;
   created_by_user_id?: number | null;
   assignment_date?: Date;
@@ -31,6 +32,7 @@ export class ProjectAssignment
   declare public assignment_no: string;
   declare public from_project_id: number | null;
   declare public to_project_id: number;
+  declare public plant_id: number;
   declare public assigned_to_person: string;
   declare public created_by_user_id: number | null;
   declare public assignment_date: Date;
@@ -72,6 +74,11 @@ ProjectAssignment.init(
         model: 'projects',
         key: 'id',
       },
+    },
+    plant_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
     },
     assigned_to_person: {
       type: DataTypes.STRING(150),

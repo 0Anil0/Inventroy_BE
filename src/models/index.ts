@@ -24,10 +24,16 @@ import { ProjectAssignmentItem } from './ProjectAssignmentItem';
 import { PurchaseRequisition } from './PurchaseRequisition';
 import { PurchaseRequisitionItem } from './PurchaseRequisitionItem';
 import { InventoryLot } from './InventoryLot';
+import { Plant } from './Plant';
+import { UserPlant } from './UserPlant';
 
 // User & Role Associations
 User.belongsTo(Role, { foreignKey: 'role_id', as: 'role' });
 Role.hasMany(User, { foreignKey: 'role_id', as: 'users' });
+
+// User & Plant Associations
+User.belongsToMany(Plant, { through: UserPlant, foreignKey: 'user_id', as: 'plants' });
+Plant.belongsToMany(User, { through: UserPlant, foreignKey: 'plant_id', as: 'users' });
 
 // Storage Location Associations
 StorageShelf.hasMany(StorageRack, { foreignKey: 'shelf_id', as: 'racks', onDelete: 'CASCADE' });
@@ -176,4 +182,6 @@ export {
   PurchaseRequisition,
   PurchaseRequisitionItem,
   InventoryLot,
+  Plant,
+  UserPlant,
 };

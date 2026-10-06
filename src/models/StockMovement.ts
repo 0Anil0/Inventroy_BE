@@ -6,6 +6,7 @@ import { User } from './User';
 
 export interface StockMovementAttributes {
   id: number;
+  plant_id: number;
   project_id?: number | null;
   item_type_id: number;
   user_id?: number | null;
@@ -26,6 +27,7 @@ export class StockMovement
   implements StockMovementAttributes
 {
   declare public id: number;
+  declare public plant_id: number;
   declare public project_id: number | null;
   declare public item_type_id: number;
   declare public user_id: number | null;
@@ -55,6 +57,14 @@ StockMovement.init(
       allowNull: true,
       references: {
         model: 'projects',
+        key: 'id',
+      },
+    },
+    plant_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'plants',
         key: 'id',
       },
     },

@@ -17,6 +17,7 @@ export class ReportService {
    * Report 1: Stock Inventory Summary & Valuation Report
    */
   public static async getStockSummaryReport(filters?: {
+    plant_id?: number;
     project_id?: number;
     health?: 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
     search?: string;
@@ -24,6 +25,9 @@ export class ReportService {
     limit?: number;
   }) {
     const where: any = {};
+    if (filters?.plant_id) {
+      where.plant_id = filters.plant_id;
+    }
     if (filters?.project_id) {
       where.project_id = filters.project_id;
     }
@@ -84,6 +88,7 @@ export class ReportService {
    * Report 2: Purchase Orders & Procurement Report
    */
   public static async getPurchaseOrdersReport(filters?: {
+    plant_id?: number;
     vendor_id?: number;
     status?: string;
     startDate?: string;
@@ -93,6 +98,7 @@ export class ReportService {
     limit?: number;
   }) {
     const where: any = {};
+    if (filters?.plant_id) where.plant_id = filters.plant_id;
     if (filters?.vendor_id) where.vendor_id = filters.vendor_id;
     if (filters?.status && filters.status !== 'ALL') where.status = filters.status;
 
@@ -158,12 +164,14 @@ export class ReportService {
    * Report 3: Material Issue Vouchers (Consumption) Report
    */
   public static async getMaterialIssuesReport(filters?: {
+    plant_id?: number;
     project_id?: number;
     recipient?: string;
     startDate?: string;
     endDate?: string;
   }) {
     const where: any = {};
+    if (filters?.plant_id) where.plant_id = filters.plant_id;
     if (filters?.project_id) where.project_id = filters.project_id;
     if (filters?.recipient) {
       where.issued_to = { [Op.iLike]: `%${filters.recipient}%` };
@@ -194,11 +202,13 @@ export class ReportService {
    * Report 4: Inter-Project Stock Transfers Report
    */
   public static async getStockTransfersReport(filters?: {
+    plant_id?: number;
     project_id?: number;
     startDate?: string;
     endDate?: string;
   }) {
     const where: any = { type: 'TRANSFER' };
+    if (filters?.plant_id) where.plant_id = filters.plant_id;
     if (filters?.project_id) where.project_id = filters.project_id;
 
     if (filters?.startDate && filters?.endDate) {
@@ -222,6 +232,7 @@ export class ReportService {
    * Report 5: Complete Audit Trail Movement Ledger Report
    */
   public static async getAuditLedgerReport(filters?: {
+    plant_id?: number;
     project_id?: number;
     item_type_id?: number;
     type?: string;
@@ -232,6 +243,7 @@ export class ReportService {
     limit?: number;
   }) {
     const where: any = {};
+    if (filters?.plant_id) where.plant_id = filters.plant_id;
     if (filters?.project_id) where.project_id = filters.project_id;
     if (filters?.item_type_id) where.item_type_id = filters.item_type_id;
     if (filters?.type && filters.type !== 'ALL') where.type = filters.type;
@@ -289,6 +301,7 @@ export class ReportService {
    * Report 6: Stock Procurement & Allocation Analytics (General vs Project Purpose)
    */
   public static async getProcurementDistributionReport(filters?: {
+    plant_id?: number;
     project_id?: number;
     search?: string;
     health?: 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
@@ -299,20 +312,25 @@ export class ReportService {
       order: [['id', 'ASC']],
     });
 
+    const poWhere: any = { status: { [Op.notIn]: ['CANCELLED', 'REJECTED'] } };
+    if (filters?.plant_id) poWhere.plant_id = filters.plant_id;
+
     const poItems = await PurchaseOrderItem.findAll({
       include: [
         {
           model: PurchaseOrder,
           as: 'purchase_order',
-          where: {
-            status: { [Op.notIn]: ['CANCELLED', 'REJECTED'] },
-          },
+          where: poWhere,
           include: [{ model: Project, as: 'project', attributes: ['id', 'name', 'code'] }],
         },
       ],
     });
 
+    const invWhere: any = {};
+    if (filters?.plant_id) invWhere.plant_id = filters.plant_id;
+
     const inventoryList = await ProjectInventory.findAll({
+      where: invWhere,
       include: [{ model: Project, as: 'project', attributes: ['id', 'name', 'code'] }],
     });
 
@@ -474,6 +492,7 @@ export class ReportService {
    * Report 8: Project Financial Costing & Investment Report (How much money put into project)
    */
   public static async getProjectFinancialCostingReport(filters?: {
+    plant_id?: number;
     project_id?: number;
     search?: string;
     page?: number;
@@ -536,6 +555,7 @@ export class ReportService {
     }
 
     const whereAssignment: any = {};
+    if (filters?.plant_id) whereAssignment.plant_id = filters.plant_id;
     if (targetProjectIds.length > 0) {
       whereAssignment.to_project_id = { [Op.in]: targetProjectIds };
     }

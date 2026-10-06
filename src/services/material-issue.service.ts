@@ -9,9 +9,10 @@ import {
 } from '../models';
 
 export class MaterialIssueService {
-  public static async getAll(filters?: { project_id?: number }) {
+  public static async getAll(filters?: { project_id?: number; plant_id?: number }) {
     const where: any = {};
     if (filters?.project_id) where.project_id = filters.project_id;
+    if (filters?.plant_id) where.plant_id = filters.plant_id;
 
     return await MaterialIssue.findAll({
       where,
@@ -53,6 +54,7 @@ export class MaterialIssueService {
       item_type_id: number;
       quantity: number;
     }>;
+    plant_id: number;
   }) {
     const count = await MaterialIssue.count();
     const issueNumber = `MR-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
@@ -63,7 +65,7 @@ export class MaterialIssueService {
     // Verify stock availability for all items before processing
     for (const item of data.items) {
       const inv = await ProjectInventory.findOne({
-        where: { project_id: data.project_id, item_type_id: item.item_type_id },
+        where: { project_id: data.project_id, item_type_id: item.item_type_id, plant_id: data.plant_id },
         include: [{ model: ItemType, as: 'item_type' }],
       });
 
@@ -80,6 +82,7 @@ export class MaterialIssueService {
       issue_number: issueNumber,
       project_id: data.project_id,
       issued_to: data.issued_to,
+      plant_id: data.plant_id,
       issued_by_user_id: data.issued_by_user_id || null,
       issue_date: new Date(),
       notes: data.notes || null,
@@ -94,7 +97,7 @@ export class MaterialIssueService {
       });
 
       const inv = await ProjectInventory.findOne({
-        where: { project_id: data.project_id, item_type_id: item.item_type_id },
+        where: { project_id: data.project_id, item_type_id: item.item_type_id, plant_id: data.plant_id },
       });
 
       if (inv) {
@@ -106,6 +109,7 @@ export class MaterialIssueService {
         await StockMovement.create({
           project_id: data.project_id,
           item_type_id: item.item_type_id,
+          plant_id: data.plant_id,
           user_id: data.issued_by_user_id || null,
           type: 'OUT',
           quantity: item.quantity,

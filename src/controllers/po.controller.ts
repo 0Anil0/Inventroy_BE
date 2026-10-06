@@ -20,6 +20,7 @@ export class POController {
           status: status ? String(status) : undefined,
           page: page ? parseInt(String(page), 10) : undefined,
           limit: limit ? parseInt(String(limit), 10) : undefined,
+          plant_id: (req as AuthenticatedRequest).plantId,
         },
         currentUser
       );
@@ -46,8 +47,14 @@ export class POController {
   public static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { vendor_id, project_id, terms_and_conditions_id, notes, expected_date, items, po_number } = req.body;
-      const user = (req as AuthenticatedRequest).user;
-      const createdById = user ? user.userId : undefined;
+      const authReq = req as AuthenticatedRequest;
+      const createdById = authReq.user ? authReq.user.userId : undefined;
+      const plant_id = authReq.plantId;
+
+      if (!plant_id) {
+        res.status(400).json({ success: false, message: 'Plant selection is required' });
+        return;
+      }
 
       if (!vendor_id || !Array.isArray(items) || items.length === 0) {
         res.status(400).json({
@@ -61,6 +68,7 @@ export class POController {
         {
           po_number,
           vendor_id: parseInt(String(vendor_id), 10),
+          plant_id,
           project_id: project_id ? parseInt(String(project_id), 10) : undefined,
           terms_and_conditions_id: terms_and_conditions_id ? parseInt(String(terms_and_conditions_id), 10) : undefined,
           notes,
@@ -142,7 +150,8 @@ export class POController {
     try {
       const id = parseInt(String(req.params.id), 10);
       const userId = (req as any).user?.userId;
-      const purchaseOrder = await POService.receiveStock(id, userId);
+      const plantId = (req as AuthenticatedRequest).plantId;
+      const purchaseOrder = await POService.receiveStock(id, userId, plantId);
       res.json({
         success: true,
         message: 'Stock received and updated in inventory successfully',
@@ -176,6 +185,7 @@ export class POController {
         search: search ? String(search) : undefined,
         page: page ? parseInt(String(page), 10) : undefined,
         limit: limit ? parseInt(String(limit), 10) : undefined,
+        plant_id: (req as AuthenticatedRequest).plantId,
       });
       res.json(result);
     } catch (error: any) {

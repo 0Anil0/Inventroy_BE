@@ -6,11 +6,15 @@ export class ProjectService {
     category?: 'ALL' | 'MAIN' | 'SUB';
     page?: number;
     limit?: number;
+    plant_id?: number;
   }) {
-    const { search, category, page, limit } = params || {};
+    const { search, category, page, limit, plant_id } = params || {};
     const { Op } = require('sequelize');
 
     const where: any = {};
+    if (plant_id) {
+      where.plant_id = plant_id;
+    }
 
     if (search && search.trim()) {
       const q = `%${search.trim()}%`;
@@ -41,9 +45,9 @@ export class ProjectService {
       distinct: true,
     });
 
-    const totalCount = await Project.count();
-    const mainCount = await Project.count({ where: { parent_id: null } });
-    const subCount = await Project.count({ where: { parent_id: { [Op.ne]: null } } });
+    const totalCount = await Project.count({ where: plant_id ? { plant_id } : {} });
+    const mainCount = await Project.count({ where: { parent_id: null, ...(plant_id ? { plant_id } : {}) } });
+    const subCount = await Project.count({ where: { parent_id: { [Op.ne]: null }, ...(plant_id ? { plant_id } : {}) } });
 
     return {
       projects: rows,
@@ -69,8 +73,9 @@ export class ProjectService {
     location?: string;
     description?: string;
     parent_id?: number | null;
+    plant_id?: number;
   }) {
-    const existingCode = await Project.findOne({ where: { code: data.code } });
+    const existingCode = await Project.findOne({ where: { code: data.code, plant_id: data.plant_id || 1 } });
     if (existingCode) {
       throw new Error('Project code already exists');
     }
@@ -87,6 +92,7 @@ export class ProjectService {
       location: data.location || null,
       description: data.description || null,
       parent_id: parentId,
+      plant_id: data.plant_id || 1,
     });
 
     return await this.getById(newProject.id);

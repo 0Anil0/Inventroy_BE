@@ -7,6 +7,7 @@ export interface StorageShelfAttributes {
   name: string;
   zone?: string | null;
   description?: string | null;
+  plant_id: number;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -23,6 +24,7 @@ export class StorageShelf
   declare public name: string;
   declare public zone: string | null;
   declare public description: string | null;
+  declare public plant_id: number;
 
   declare public readonly createdAt: Date;
   declare public readonly updatedAt: Date;
@@ -51,6 +53,11 @@ StorageShelf.init(
     description: {
       type: DataTypes.STRING(255),
       allowNull: true,
+    },
+    plant_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
     },
   },
   {

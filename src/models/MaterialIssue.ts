@@ -8,6 +8,7 @@ export interface MaterialIssueAttributes {
   id: number;
   issue_number: string;
   project_id: number;
+  plant_id: number;
   issued_to: string;
   issued_by_user_id?: number | null;
   issue_date?: Date;
@@ -26,6 +27,7 @@ export class MaterialIssue
   declare public id: number;
   declare public issue_number: string;
   declare public project_id: number;
+  declare public plant_id: number;
   declare public issued_to: string;
   declare public issued_by_user_id: number | null;
   declare public issue_date: Date;
@@ -58,6 +60,11 @@ MaterialIssue.init(
         model: 'projects',
         key: 'id',
       },
+    },
+    plant_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
     },
     issued_to: {
       type: DataTypes.STRING(150),

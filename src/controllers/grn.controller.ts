@@ -23,8 +23,14 @@ export const getGRNs = async (req: Request, res: Response): Promise<void> => {
   try {
     const { vendor_id, project_id, po_id, from_date, to_date, search, page, limit } = req.query;
 
+    const plantId = (req as any).plantId;
+
     const where: any = {};
     const poWhere: any = {};
+
+    if (plantId) {
+      poWhere.plant_id = Number(plantId);
+    }
 
     if (po_id) {
       where.po_id = Number(po_id);
@@ -231,6 +237,12 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
     }
 
     const userId = (req as any).user?.userId || (req as any).user?.id || null;
+    const plant_id = (req as any).plantId;
+    if (!plant_id) {
+      res.status(400).json({ message: 'Plant selection is required' });
+      await transaction.rollback();
+      return;
+    }
 
     const grn = await GoodsReceiptNote.create(
       {
@@ -314,6 +326,7 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
         where: {
           project_id: targetProjectId,
           item_type_id: Number(itemData.item_type_id),
+          plant_id,
         },
         transaction,
       });
@@ -333,6 +346,7 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
           {
             project_id: targetProjectId,
             item_type_id: Number(itemData.item_type_id),
+            plant_id,
             shelf_id: shelfId,
             rack_id: rackId,
             quantity: receivedQtyNow,
@@ -366,6 +380,7 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
         {
           project_id: targetProjectId,
           item_type_id: Number(itemData.item_type_id),
+          plant_id,
           user_id: userId,
           type: 'IN',
           quantity: receivedQtyNow,

@@ -21,6 +21,7 @@ export class POService {
       status?: string;
       page?: number;
       limit?: number;
+      plant_id?: number;
     },
     currentUser?: { userId: number; role: string }
   ) {
@@ -34,6 +35,7 @@ export class POService {
     }
     if (filters?.vendor_id) where.vendor_id = filters.vendor_id;
     if (filters?.status && filters.status !== 'ALL') where.status = filters.status;
+    if (filters?.plant_id) where.plant_id = filters.plant_id;
 
     // Role-based visibility check:
     // If role is NOT ADMIN, strictly only show POs created by this user
@@ -132,6 +134,7 @@ export class POService {
       order_date?: string;
       expected_date?: string;
       status?: string;
+      plant_id: number;
       items: Array<{
         item_type_id: number;
         cat_no?: string;
@@ -185,6 +188,7 @@ export class POService {
     const po = await PurchaseOrder.create({
       po_number: poNumber,
       vendor_id: data.vendor_id,
+      plant_id: data.plant_id,
       project_id: data.project_id || null,
       terms_and_conditions_id: data.terms_and_conditions_id || null,
       created_by_id: createdById || null,
@@ -425,6 +429,7 @@ export class POService {
       await this.create({
         po_number: 'EEEA/26-27/54',
         vendor_id: vendor.id,
+        plant_id: 1,
         order_date: '2026-07-24',
         notes: 'Project No. 1000104 - Heavy Duty Plugs & Sockets Supply',
         status: 'APPROVED',
@@ -435,7 +440,7 @@ export class POService {
     }
   }
 
-  public static async receiveStock(poId: number, userId?: number) {
+  public static async receiveStock(poId: number, userId?: number, plant_id?: number) {
     const po = await this.getById(poId);
     if (!po) throw new Error('Purchase order not found');
     if (po.status === 'RECEIVED') {
@@ -456,10 +461,11 @@ export class POService {
       const targetProjectId = (po.project_id && po.project_id !== 0) ? Number(po.project_id) : null;
 
       const [projInv] = await ProjectInventory.findOrCreate({
-        where: { project_id: targetProjectId, item_type_id: item.item_type_id },
+        where: { project_id: targetProjectId, item_type_id: item.item_type_id, plant_id: plant_id || po.plant_id },
         defaults: {
           project_id: targetProjectId,
           item_type_id: item.item_type_id,
+          plant_id: plant_id || po.plant_id,
           quantity: 0,
           min_quantity: 10,
         },
@@ -472,6 +478,7 @@ export class POService {
       await StockMovement.create({
         project_id: targetProjectId,
         item_type_id: item.item_type_id,
+        plant_id: plant_id || po.plant_id,
         user_id: userId || null,
         type: 'IN',
         quantity: qtyReceived,
@@ -508,6 +515,7 @@ export class POService {
     search?: string;
     page?: number;
     limit?: number;
+    plant_id?: number;
   }) {
     const whereItem: any = {};
     const wherePO: any = {};
@@ -520,6 +528,9 @@ export class POService {
     }
     if (params.project_id) {
       wherePO.project_id = params.project_id;
+    }
+    if (params.plant_id) {
+      wherePO.plant_id = params.plant_id;
     }
     if (params.status && params.status !== 'ALL') {
       wherePO.status = params.status;

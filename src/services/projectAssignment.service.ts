@@ -18,10 +18,14 @@ export class ProjectAssignmentService {
     to_date?: string;
     page?: number;
     limit?: number;
+    plant_id?: number;
   }) {
     const where: any = {};
     if (params?.to_project_id) {
       where.to_project_id = params.to_project_id;
+    }
+    if (params?.plant_id) {
+      where.plant_id = params.plant_id;
     }
 
     const allAssignments = await ProjectAssignment.findAll({
@@ -144,8 +148,9 @@ export class ProjectAssignmentService {
       lot_id?: number | null;
       quantity: number;
     }>;
+    plant_id: number;
   }) {
-    const { from_project_id, to_project_id, assigned_to_person, notes, created_by_user_id, items } = data;
+    const { from_project_id, to_project_id, assigned_to_person, notes, created_by_user_id, items, plant_id } = data;
 
     const fromTargetId = (from_project_id && from_project_id !== 0) ? Number(from_project_id) : null;
     const toTargetId = Number(to_project_id);
@@ -233,7 +238,7 @@ export class ProjectAssignmentService {
 
       // 1. Deduct from Aggregate Source Inventory (where sourceProjectId is lot's origin project_id or fromTargetId)
       const sourceInventory = await ProjectInventory.findOne({
-        where: { project_id: sourceProjectId, item_type_id: itemTypeId },
+        where: { project_id: sourceProjectId, item_type_id: itemTypeId, plant_id },
       });
 
       if (sourceInventory) {
@@ -247,6 +252,7 @@ export class ProjectAssignmentService {
       await StockMovement.create({
         project_id: sourceProjectId,
         item_type_id: itemTypeId,
+        plant_id,
         user_id: created_by_user_id || null,
         type: 'TRANSFER',
         quantity: qty,
@@ -273,11 +279,11 @@ export class ProjectAssignmentService {
       });
     }
 
-    // Create Project Assignment Record
     const assignment = await ProjectAssignment.create({
       assignment_no,
       from_project_id: fromTargetId,
       to_project_id: toTargetId,
+      plant_id,
       assigned_to_person: assigned_to_person.trim(),
       created_by_user_id: created_by_user_id || null,
       notes: notes ? notes.trim() : null,
@@ -311,6 +317,7 @@ export class ProjectAssignmentService {
         lot_id?: number | null;
         quantity: number;
       }>;
+      plant_id: number;
     }
   ) {
     const existing = await ProjectAssignment.findByPk(id, {
@@ -336,7 +343,7 @@ export class ProjectAssignmentService {
       }
 
       const sourceInv = await ProjectInventory.findOne({
-        where: { project_id: sourceProjectId, item_type_id: itemTypeId },
+        where: { project_id: sourceProjectId, item_type_id: itemTypeId, plant_id: data.plant_id },
       });
       if (sourceInv) {
         await sourceInv.update({ quantity: sourceInv.quantity + qty });
@@ -409,7 +416,7 @@ export class ProjectAssignmentService {
       }
 
       const sourceInv = await ProjectInventory.findOne({
-        where: { project_id: sourceProjectId, item_type_id: itemTypeId },
+        where: { project_id: sourceProjectId, item_type_id: itemTypeId, plant_id: data.plant_id },
       });
       if (sourceInv) {
         await sourceInv.update({ quantity: Math.max(0, sourceInv.quantity - qty) });
@@ -452,7 +459,7 @@ export class ProjectAssignmentService {
     return await this.getById(existing.id);
   }
 
-  public static async delete(id: number) {
+  public static async delete(id: number, plant_id: number) {
     const assignment = await ProjectAssignment.findByPk(id, {
       include: [{ model: ProjectAssignmentItem, as: 'items' }],
     });
@@ -477,8 +484,8 @@ export class ProjectAssignmentService {
       }
 
       const [sourceInv] = await ProjectInventory.findOrCreate({
-        where: { project_id: sourceProjectId, item_type_id: itemTypeId },
-        defaults: { project_id: sourceProjectId, item_type_id: itemTypeId, quantity: 0, min_quantity: 10 },
+        where: { project_id: sourceProjectId, item_type_id: itemTypeId, plant_id },
+        defaults: { project_id: sourceProjectId, item_type_id: itemTypeId, plant_id, quantity: 0, min_quantity: 10 },
       });
       const oldSrcQty = sourceInv.quantity;
       const newSrcQty = oldSrcQty + qty;
@@ -487,6 +494,7 @@ export class ProjectAssignmentService {
       await StockMovement.create({
         project_id: sourceProjectId,
         item_type_id: itemTypeId,
+        plant_id,
         type: 'IN',
         quantity: qty,
         previous_quantity: oldSrcQty,

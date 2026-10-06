@@ -33,6 +33,7 @@ import inventoryRoutes from './routes/inventory.routes';
 import projectAssignmentRoutes from './routes/projectAssignment.routes';
 import prRoutes from './routes/pr.routes';
 import inventoryLotRoutes from './routes/inventoryLot.routes';
+import plantRoutes from './routes/plant.routes';
 import { errorHandler } from './middlewares/error.middleware';
 
 const app = express();
@@ -67,6 +68,7 @@ app.use('/api', prRoutes);
 app.use('/api', inventoryLotRoutes);
 app.use('/api/grn', grnRoutes);
 app.use('/api/project-assignments', projectAssignmentRoutes);
+app.use('/api', plantRoutes);
 
 // Health Check Route
 app.get('/api/health', (req: Request, res: Response) => {
@@ -109,6 +111,8 @@ const startServer = async () => {
         'ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "parent_id" INTEGER;',
         'ALTER TABLE "projects" DROP CONSTRAINT IF EXISTS "projects_parent_id_fkey";',
         'ALTER TABLE "projects" ADD CONSTRAINT "projects_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "projects"("id") ON DELETE CASCADE;',
+        'ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "plant_id" INTEGER DEFAULT 1;',
+        'ALTER TABLE "storage_shelves" ADD COLUMN IF NOT EXISTS "plant_id" INTEGER DEFAULT 1;',
         'ALTER TABLE "purchase_requisitions" ADD COLUMN IF NOT EXISTS "created_by_id" INTEGER;',
         'ALTER TABLE "purchase_requisitions" ADD COLUMN IF NOT EXISTS "approved_by_id" INTEGER;',
         'ALTER TABLE "purchase_requisitions" ADD COLUMN IF NOT EXISTS "rejected_by_id" INTEGER;',

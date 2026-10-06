@@ -3,6 +3,7 @@ import { verifyToken, TokenPayload } from '../utils/auth.utils';
 
 export interface AuthenticatedRequest extends Request {
   user?: TokenPayload;
+  plantId?: number;
 }
 
 export const authenticateToken = (
@@ -21,6 +22,12 @@ export const authenticateToken = (
   try {
     const decoded = verifyToken(token);
     req.user = decoded;
+    
+    const plantIdHeader = req.headers['x-plant-id'];
+    if (plantIdHeader) {
+      req.plantId = parseInt(plantIdHeader as string, 10);
+    }
+    
     next();
   } catch (error) {
     res.status(403).json({ success: false, message: 'Invalid or expired token' });
