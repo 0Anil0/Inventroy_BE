@@ -317,6 +317,7 @@ export const createGRN = async (req: Request, res: Response): Promise<void> => {
           assigned_qty: 0,
           shelf_id: shelfId,
           rack_id: rackId,
+          plant_id,
           lot_number: `${po.po_number || 'PO'}-${grn_number}-I${itemData.item_type_id}-${itemSeq}`,
         },
         { transaction }

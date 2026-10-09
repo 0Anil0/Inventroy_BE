@@ -84,11 +84,18 @@ export class POApproverService {
     return approver;
   }
 
-  public static async isUserApprover(userId: number, roleName?: string): Promise<boolean> {
-    if (roleName && roleName.toUpperCase() === 'ADMIN') {
-      return true;
-    }
+  public static async isUserApprover(userId: number, roleName?: string, poAmount?: number): Promise<boolean> {
     const approver = await POApprover.findOne({ where: { user_id: userId, is_active: true } });
-    return !!approver;
+    if (!approver) return false;
+
+    if (poAmount !== undefined && poAmount !== null) {
+      if (approver.min_amount !== null && approver.min_amount !== undefined && poAmount < approver.min_amount) {
+        return false;
+      }
+      if (approver.max_amount !== null && approver.max_amount !== undefined && poAmount > approver.max_amount) {
+        return false;
+      }
+    }
+    return true;
   }
 }

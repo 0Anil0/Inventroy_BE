@@ -10,6 +10,7 @@ import { StorageRack } from './StorageRack';
 
 export interface InventoryLotAttributes {
   id: number;
+  plant_id: number;
   item_type_id: number;
   po_id?: number | null;
   po_item_id?: number | null;
@@ -37,6 +38,7 @@ export class InventoryLot
   implements InventoryLotAttributes
 {
   declare public id: number;
+  declare public plant_id: number;
   declare public item_type_id: number;
   declare public po_id: number | null;
   declare public po_item_id: number | null;
@@ -68,6 +70,14 @@ InventoryLot.init(
       type: DataTypes.INTEGER,
       autoIncrement: true,
       primaryKey: true,
+    },
+    plant_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'plants',
+        key: 'id',
+      },
     },
     item_type_id: {
       type: DataTypes.INTEGER,

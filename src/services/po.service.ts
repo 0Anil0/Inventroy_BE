@@ -335,13 +335,13 @@ export class POService {
   }
 
   public static async approve(id: number, userId: number, roleName: string) {
-    const isApprover = await POApproverService.isUserApprover(userId, roleName);
-    if (!isApprover) {
-      throw new Error('You are not an authorized PO approver');
-    }
-
     const po = await PurchaseOrder.findByPk(id);
     if (!po) throw new Error('Purchase order not found');
+
+    const isApprover = await POApproverService.isUserApprover(userId, roleName, po.total_amount);
+    if (!isApprover) {
+      throw new Error('You are not authorized to approve this PO. The total amount exceeds your approval limit.');
+    }
 
     if (po.status === 'APPROVED') {
       throw new Error('Purchase order is already approved');
@@ -357,13 +357,13 @@ export class POService {
   }
 
   public static async reject(id: number, userId: number, roleName: string) {
-    const isApprover = await POApproverService.isUserApprover(userId, roleName);
-    if (!isApprover) {
-      throw new Error('You are not an authorized PO approver');
-    }
-
     const po = await PurchaseOrder.findByPk(id);
     if (!po) throw new Error('Purchase order not found');
+
+    const isApprover = await POApproverService.isUserApprover(userId, roleName, po.total_amount);
+    if (!isApprover) {
+      throw new Error('You are not authorized to reject this PO. The total amount exceeds your approval limit.');
+    }
 
     await po.update({
       status: 'REJECTED',

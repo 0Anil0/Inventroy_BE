@@ -113,6 +113,7 @@ const startServer = async () => {
         'ALTER TABLE "projects" ADD CONSTRAINT "projects_parent_id_fkey" FOREIGN KEY ("parent_id") REFERENCES "projects"("id") ON DELETE CASCADE;',
         'ALTER TABLE "projects" ADD COLUMN IF NOT EXISTS "plant_id" INTEGER DEFAULT 1;',
         'ALTER TABLE "storage_shelves" ADD COLUMN IF NOT EXISTS "plant_id" INTEGER DEFAULT 1;',
+        'ALTER TABLE "inventory_lots" ADD COLUMN IF NOT EXISTS "plant_id" INTEGER DEFAULT 1;',
         'ALTER TABLE "purchase_requisitions" ADD COLUMN IF NOT EXISTS "created_by_id" INTEGER;',
         'ALTER TABLE "purchase_requisitions" ADD COLUMN IF NOT EXISTS "approved_by_id" INTEGER;',
         'ALTER TABLE "purchase_requisitions" ADD COLUMN IF NOT EXISTS "rejected_by_id" INTEGER;',

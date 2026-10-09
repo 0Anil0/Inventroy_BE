@@ -234,7 +234,7 @@ export class InventoryService {
 
     if (!plant_id) throw new Error('Plant selection is required');
 
-    const targetProjectId = (project_id && project_id !== 0) ? project_id : null;
+    const targetProjectId = (project_id === 0 || !project_id || isNaN(project_id)) ? null : project_id;
     let projectName = 'General Stock / Main Store';
 
     if (targetProjectId) {
@@ -293,6 +293,7 @@ export class InventoryService {
       const generatedLotNo = lot_number || `LOT-OPENING-${Date.now().toString().slice(-6)}`;
 
       await InventoryLot.create({
+        plant_id,
         item_type_id,
         project_id: targetProjectId,
         unit_price: unitRateVal,
@@ -364,7 +365,7 @@ export class InventoryService {
 
     if (!plant_id) throw new Error('Plant selection is required');
 
-    const targetProjectId = (project_id && project_id !== 0) ? project_id : null;
+    const targetProjectId = (project_id === 0 || !project_id || isNaN(project_id)) ? null : project_id;
     if (targetProjectId) {
       const project = await Project.findByPk(targetProjectId);
       if (!project) throw new Error('Project not found');
@@ -458,6 +459,7 @@ export class InventoryService {
     } else {
       sourceLot = await InventoryLot.findOne({
         where: {
+          plant_id,
           project_id: fromTargetId,
           item_type_id,
           available_qty: { [Op.gte]: quantity },
@@ -475,6 +477,7 @@ export class InventoryService {
 
       // Replicate/Create InventoryLot in Destination Project
       await InventoryLot.create({
+        plant_id,
         item_type_id,
         project_id: toTargetId,
         po_id: sourceLot.po_id,

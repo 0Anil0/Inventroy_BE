@@ -122,7 +122,17 @@ export class ReportService {
       order: [['order_date', 'DESC']],
     });
 
-    let filtered = poList;
+    let filtered = poList.map((po: any) => {
+      const p = po.toJSON ? po.toJSON() : po;
+      let grand = 0;
+      if (p.items && p.items.length > 0) {
+        grand = p.items.reduce((sum: number, i: any) => sum + Number(i.total_price || 0) + Number(i.tax_amount || 0), 0);
+      } else {
+        grand = p.total_amount;
+      }
+      p.total_amount = Math.round(grand);
+      return p;
+    });
 
     if (filters?.search && filters.search.trim()) {
       const q = filters.search.trim().toLowerCase();
@@ -622,16 +632,9 @@ export class ReportService {
           unitCost = Number((priceAfterDisc * (1 + gstPercent / 100)).toFixed(2));
         } else if (item.unit_price !== undefined && item.unit_price !== null && Number(item.unit_price) > 0) {
           baseUnitPrice = Number(item.unit_price);
-          if (latestPoItemMap[item.item_type_id]) {
-            const poInfo = latestPoItemMap[item.item_type_id];
-            gstPercent = poInfo.gst_percent;
-            discPercent = poInfo.disc_percent;
-            unitCost = Number((baseUnitPrice * (1 + gstPercent / 100)).toFixed(2));
-          } else {
-            gstPercent = 0;
-            discPercent = 0;
-            unitCost = baseUnitPrice;
-          }
+          gstPercent = 0;
+          discPercent = 0;
+          unitCost = baseUnitPrice;
         } else if (latestPoItemMap[item.item_type_id]) {
           const poInfo = latestPoItemMap[item.item_type_id];
           baseUnitPrice = poInfo.base_unit_price;
