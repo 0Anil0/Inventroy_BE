@@ -6,8 +6,9 @@ export class InventoryLotController {
     try {
       const project_id = req.query.project_id ? parseInt(String(req.query.project_id), 10) : undefined;
       const item_type_id = req.query.item_type_id ? parseInt(String(req.query.item_type_id), 10) : undefined;
+      const plant_id = (req as any).plantId;
 
-      const lots = await InventoryLotService.getAvailableLots({ project_id, item_type_id });
+      const lots = await InventoryLotService.getAvailableLots({ project_id, item_type_id, plant_id });
       res.json({ success: true, lots });
     } catch (error: any) {
       console.error('Error fetching inventory lots:', error);

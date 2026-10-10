@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { PRService } from '../services/pr.service';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
+import { formatErrorMessage } from '../utils/error.utils';
 
 export class PRController {
   public static async getAll(req: Request, res: Response, next: NextFunction) {
@@ -27,8 +28,8 @@ export class PRController {
         convertedCount: result.convertedCount,
         items: result.items,
       });
-    } catch (err) {
-      next(err);
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: formatErrorMessage(err) });
     }
   }
 
@@ -37,8 +38,8 @@ export class PRController {
       const id = Number(req.params.id);
       const pr = await PRService.getById(id);
       res.json({ success: true, requisition: pr });
-    } catch (err) {
-      next(err);
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: formatErrorMessage(err) });
     }
   }
 
@@ -55,8 +56,8 @@ export class PRController {
 
       const pr = await PRService.create({ ...req.body, plant_id }, userId);
       res.status(201).json({ success: true, message: 'Purchase Requisition created successfully', requisition: pr });
-    } catch (err) {
-      next(err);
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: formatErrorMessage(err) });
     }
   }
 
@@ -66,8 +67,8 @@ export class PRController {
       const reviewerId = (req as any).user?.id || (req as any).user?.userId;
       const pr = await PRService.reviewAndApprove(id, req.body, reviewerId);
       res.json({ success: true, message: 'Purchase Requisition reviewed & updated', requisition: pr });
-    } catch (err) {
-      next(err);
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: formatErrorMessage(err) });
     }
   }
 
@@ -77,8 +78,8 @@ export class PRController {
       const userId = (req as any).user?.id || (req as any).user?.userId;
       const result = await PRService.convertToPO(id, req.body, userId);
       res.json(result);
-    } catch (err) {
-      next(err);
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: formatErrorMessage(err) });
     }
   }
 
@@ -87,8 +88,8 @@ export class PRController {
       const id = Number(req.params.id);
       const result = await PRService.delete(id);
       res.json(result);
-    } catch (err) {
-      next(err);
+    } catch (err: any) {
+      res.status(400).json({ success: false, message: formatErrorMessage(err) });
     }
   }
 }

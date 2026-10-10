@@ -25,6 +25,8 @@ export interface InventoryLotAttributes {
   lot_number?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
+  shelf?: StorageShelf | null;
+  rack?: StorageRack | null;
 }
 
 export interface InventoryLotCreationAttributes

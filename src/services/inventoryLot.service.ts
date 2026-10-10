@@ -11,12 +11,17 @@ export class InventoryLotService {
   public static async getAvailableLots(params: {
     project_id?: number;
     item_type_id?: number;
+    plant_id?: number;
   }) {
-    const { project_id, item_type_id } = params;
+    const { project_id, item_type_id, plant_id } = params;
 
     const whereClause: any = {
       available_qty: { [Op.gt]: 0 },
     };
+
+    if (plant_id) {
+      whereClause.plant_id = plant_id;
+    }
 
     if (item_type_id) {
       whereClause.item_type_id = item_type_id;

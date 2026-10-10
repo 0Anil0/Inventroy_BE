@@ -90,6 +90,47 @@ export class InventoryService {
       ],
     });
 
+    // Fetch active InventoryLot locations grouped by item_type_id for multi-rack visibility
+    const lotWhere: any = { available_qty: { [Op.gt]: 0 } };
+    if (plant_id) lotWhere.plant_id = plant_id;
+    if (projectId !== -1) {
+      if (targetProjectIds.includes(null)) {
+        lotWhere[Op.or] = [{ project_id: null }, { project_id: 0 }];
+      } else {
+        lotWhere.project_id = { [Op.in]: targetProjectIds.filter((id) => id !== null) };
+      }
+    }
+
+    const activeLots = await InventoryLot.findAll({
+      where: lotWhere,
+      include: [
+        { model: StorageShelf, as: 'shelf' },
+        { model: StorageRack, as: 'rack' },
+      ],
+    });
+
+    const lotLocationsMap = new Map<number, Array<{ shelf: any; rack: any; quantity: number }>>();
+    for (const lot of activeLots) {
+      const lotObj = lot.toJSON() as any;
+      if (lotObj.shelf || lotObj.rack) {
+        const itemTypeId = lotObj.item_type_id;
+        const currentList = lotLocationsMap.get(itemTypeId) || [];
+        const existingLoc = currentList.find(
+          (l) => l.shelf?.id === lotObj.shelf?.id && l.rack?.id === lotObj.rack?.id
+        );
+        if (existingLoc) {
+          existingLoc.quantity += Number(lotObj.available_qty || 0);
+        } else {
+          currentList.push({
+            shelf: lotObj.shelf,
+            rack: lotObj.rack,
+            quantity: Number(lotObj.available_qty || 0),
+          });
+        }
+        lotLocationsMap.set(itemTypeId, currentList);
+      }
+    }
+
     // Map existing inventory by item_type_id
     const invMap = new Map<number, { quantity: number; record: any }>();
     for (const inv of existingInventories) {
@@ -109,6 +150,7 @@ export class InventoryService {
     let resultList = allItemTypes.map((itemType) => {
       const itemTypeObj = itemType.toJSON();
       const invData = invMap.get(itemTypeObj.id);
+      const locations = lotLocationsMap.get(itemTypeObj.id) || [];
 
       if (invData) {
         return {
@@ -116,6 +158,7 @@ export class InventoryService {
           item_type_id: itemTypeObj.id,
           item_type: itemTypeObj,
           quantity: invData.quantity,
+          locations,
         };
       }
 
@@ -128,6 +171,7 @@ export class InventoryService {
         min_quantity: 10,
         shelf: null,
         rack: null,
+        locations: [],
       };
     });
 

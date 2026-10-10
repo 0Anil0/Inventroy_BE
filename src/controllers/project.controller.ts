@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ProjectService } from '../services/project.service';
+import { formatErrorMessage } from '../utils/error.utils';
 
 export class ProjectController {
   public static async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -13,7 +14,7 @@ export class ProjectController {
       const result = await ProjectService.getAll({ search, category, page, limit, plant_id });
       res.json({ success: true, ...result });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      res.status(500).json({ success: false, message: formatErrorMessage(error) });
     }
   }
 
@@ -28,7 +29,7 @@ export class ProjectController {
       const project = await ProjectService.create({ name, code, location, description, parent_id, plant_id });
       res.status(201).json({ success: true, project });
     } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: formatErrorMessage(error) });
     }
   }
 
@@ -38,7 +39,7 @@ export class ProjectController {
       const project = await ProjectService.update(id, req.body);
       res.json({ success: true, project });
     } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: formatErrorMessage(error) });
     }
   }
 
@@ -48,7 +49,7 @@ export class ProjectController {
       const result = await ProjectService.delete(id);
       res.json(result);
     } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message });
+      res.status(400).json({ success: false, message: formatErrorMessage(error) });
     }
   }
 }

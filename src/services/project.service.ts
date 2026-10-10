@@ -75,22 +75,25 @@ export class ProjectService {
     parent_id?: number | null;
     plant_id?: number;
   }) {
-    const existingCode = await Project.findOne({ where: { code: data.code, plant_id: data.plant_id || 1 } });
+    const { Op } = require('sequelize');
+    const formattedCode = data.code.trim().toUpperCase();
+
+    const existingCode = await Project.findOne({ where: { code: formattedCode } });
     if (existingCode) {
-      throw new Error('Project code already exists');
+      throw new Error(`Project code "${formattedCode}" already exists.`);
     }
 
     const parentId = (data.parent_id && data.parent_id !== 0) ? Number(data.parent_id) : null;
     if (parentId) {
       const parentProject = await Project.findByPk(parentId);
-      if (!parentProject) throw new Error('Parent project not found');
+      if (!parentProject) throw new Error('Selected parent project not found.');
     }
 
     const newProject = await Project.create({
-      name: data.name,
-      code: data.code,
-      location: data.location || null,
-      description: data.description || null,
+      name: data.name.trim(),
+      code: formattedCode,
+      location: data.location ? data.location.trim() : null,
+      description: data.description ? data.description.trim() : null,
       parent_id: parentId,
       plant_id: data.plant_id || 1,
     });
@@ -108,17 +111,29 @@ export class ProjectService {
       parent_id?: number | null;
     }
   ) {
+    const { Op } = require('sequelize');
     const project = await Project.findByPk(id);
     if (!project) throw new Error('Project not found');
+
+    if (data.code) {
+      const formattedCode = data.code.trim().toUpperCase();
+      const existingCode = await Project.findOne({
+        where: { code: formattedCode, id: { [Op.ne]: id } },
+      });
+      if (existingCode) {
+        throw new Error(`Project code "${formattedCode}" already exists.`);
+      }
+      data.code = formattedCode;
+    }
 
     if (data.parent_id !== undefined) {
       const parentId = (data.parent_id && data.parent_id !== 0) ? Number(data.parent_id) : null;
       if (parentId === id) {
-        throw new Error('A project cannot be its own parent');
+        throw new Error('A project cannot be its own parent.');
       }
       if (parentId) {
         const parentProject = await Project.findByPk(parentId);
-        if (!parentProject) throw new Error('Parent project not found');
+        if (!parentProject) throw new Error('Selected parent project not found.');
       }
       data.parent_id = parentId;
     }
